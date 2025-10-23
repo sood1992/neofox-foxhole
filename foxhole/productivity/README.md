@@ -12,6 +12,7 @@ Foxhole is Neofox's ADHD-friendly operations cockpit for a full-stack marketing 
 - **Energy analytics and reports** for weekly/monthly windows including utilisation, pipeline balance, and mood trends.
 - **Revenue intelligence** with invoice tracking, expense logging, and live project margin calculations.
 - **Freelancer hub & automation alerts** to staff contractors quickly and surface overdue deadlines, retainers, invoices, and wellbeing dips.
+- **One-click CSV exports** to bring time, project, and financial summaries into executive packets or spreadsheets instantly.
 
 ## Getting started
 1. Create a MySQL database (default `foxhole_productivity`).

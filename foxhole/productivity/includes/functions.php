@@ -378,7 +378,9 @@ function get_tasks_for_user(PDO $pdo, int $userId): array
 
 function get_team_time_summary(PDO $pdo, string $startDate, string $endDate, ?int $userId = null): array
 {
-    $query = 'SELECT u.id, u.name, u.role, u.title, IFNULL(SUM(te.duration_minutes), 0) AS minutes
+    $query = 'SELECT u.id, u.name, u.role, u.title,
+            IFNULL(SUM(te.duration_minutes), 0) AS minutes,
+            COUNT(te.id) AS entry_count
         FROM users u
         LEFT JOIN time_entries te ON te.user_id = u.id AND te.end_time BETWEEN :start AND :end
         WHERE u.role != "admin"';

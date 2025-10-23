@@ -84,6 +84,97 @@ $stmt->execute($params);
 $projectRows = $stmt->fetchAll();
 
 $employees = get_users_by_role($pdo, 'employee');
+
+$baseQuery = $_GET;
+unset($baseQuery['export'], $baseQuery['dataset']);
+
+$exportType = $_GET['export'] ?? null;
+if ($exportType === 'csv') {
+    $dataset = $_GET['dataset'] ?? 'time';
+    $filenameParts = ['foxhole'];
+    $filenameParts[] = $dataset;
+    $filenameParts[] = $range;
+    if ($employeeId) {
+        $filenameParts[] = 'user-' . $employeeId;
+    }
+    $filenameParts[] = $startDate->format('Ymd') . '-' . $endDate->format('Ymd');
+    $filename = implode('_', $filenameParts) . '.csv';
+
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+    $output = fopen('php://output', 'w');
+    $sanitizeCsv = static function ($value) {
+        if (is_string($value)) {
+            $value = preg_replace("/\r|\n/", ' ', $value);
+            $trimmed = ltrim($value);
+            if ($trimmed !== '' && in_array($trimmed[0], ['=', '+', '-', '@'], true)) {
+                $value = "'" . $value;
+            }
+        }
+        return $value;
+    };
+    $writeRow = static function ($handle, array $row) use ($sanitizeCsv): void {
+        fputcsv($handle, array_map($sanitizeCsv, $row));
+    };
+
+    $writeRow($output, ['Foxhole export generated', (new DateTimeImmutable())->format(DateTimeInterface::ATOM)]);
+    fputcsv($output, []);
+
+    switch ($dataset) {
+        case 'projects':
+            $writeRow($output, ['Project', 'Status', 'Due date', 'Completed tasks', 'Total tasks', 'Hours logged']);
+            foreach ($projectRows as $project) {
+                $hours = round(((int) $project['minutes_spent']) / 60, 2);
+                $completed = (int) $project['completed_tasks'];
+                $total = (int) $project['total_tasks'];
+                $due = $project['due_date'] ? (new DateTimeImmutable($project['due_date']))->format('Y-m-d') : '—';
+                $writeRow($output, [
+                    $project['name'],
+                    $project['status'],
+                    $due,
+                    $completed,
+                    $total,
+                    $hours,
+                ]);
+            }
+            break;
+        case 'financial':
+            $writeRow($output, ['Project', 'Client', 'Invoice total', 'Invoice paid', 'Outstanding', 'Expenses', 'Internal cost', 'Margin']);
+            foreach ($financials as $row) {
+                $outstanding = ($row['invoice_total'] ?? 0) - ($row['invoice_paid'] ?? 0);
+                $margin = ($row['invoice_paid'] ?? 0) - (($row['expense_total'] ?? 0) + ($row['internal_cost'] ?? 0));
+                $writeRow($output, [
+                    $row['project_name'],
+                    $row['client_name'],
+                    number_format((float) ($row['invoice_total'] ?? 0), 2, '.', ''),
+                    number_format((float) ($row['invoice_paid'] ?? 0), 2, '.', ''),
+                    number_format((float) $outstanding, 2, '.', ''),
+                    number_format((float) ($row['expense_total'] ?? 0), 2, '.', ''),
+                    number_format((float) ($row['internal_cost'] ?? 0), 2, '.', ''),
+                    number_format((float) $margin, 2, '.', ''),
+                ]);
+            }
+            break;
+        case 'time':
+        default:
+            $writeRow($output, ['Name', 'Role', 'Title', 'Hours logged', 'Entries']);
+            foreach ($summary as $row) {
+                $hours = round(((int) $row['minutes']) / 60, 2);
+                $writeRow($output, [
+                    $row['name'],
+                    ucfirst($row['role']),
+                    $row['title'] ?? '—',
+                    $hours,
+                    $row['entry_count'] ?? 0,
+                ]);
+            }
+            break;
+    }
+
+    fclose($output);
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -130,6 +221,30 @@ $employees = get_users_by_role($pdo, 'employee');
                     </select>
                     <button class="primary-btn" type="submit">Run report</button>
                 </form>
+                <?php
+                    $buildExportUrl = static function (array $params): string {
+                        $query = http_build_query($params);
+                        return $query ? 'reports.php?' . $query : 'reports.php';
+                    };
+
+                    $timeExportUrl = $buildExportUrl(array_merge($baseQuery, ['export' => 'csv', 'dataset' => 'time']));
+                    $projectsExportUrl = $buildExportUrl(array_merge($baseQuery, ['export' => 'csv', 'dataset' => 'projects']));
+                    $financialExportUrl = $buildExportUrl(array_merge($baseQuery, ['export' => 'csv', 'dataset' => 'financial']));
+                ?>
+                <div class="export-actions">
+                    <a class="ghost-btn" href="<?= htmlspecialchars($timeExportUrl, ENT_QUOTES) ?>">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v8.59l1.3-1.3a1 1 0 0 1 1.4 1.42l-3 3a1 1 0 0 1-1.4 0l-3-3a1 1 0 0 1 1.4-1.42L11 12.59V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1-1h3a1 1 0 0 1 0 2H6v2h12v-2h-3a1 1 0 0 1 0-2h3a3 3 0 0 1 3 3v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a3 3 0 0 1 1-2.24V17Z"/></svg>
+                        Export time summary
+                    </a>
+                    <a class="ghost-btn" href="<?= htmlspecialchars($projectsExportUrl, ENT_QUOTES) ?>">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h14a2 2 0 0 1 2 2v13.5A2.5 2.5 0 0 1 18.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v12h13V5H5Zm2 3h5a1 1 0 1 1 0 2H7a1 1 0 0 1 0-2Zm0 4h8a1 1 0 1 1 0 2H7a1 1 0 0 1 0-2Z"/></svg>
+                        Export project rollup
+                    </a>
+                    <a class="ghost-btn" href="<?= htmlspecialchars($financialExportUrl, ENT_QUOTES) ?>">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 5a1 1 0 0 1 1-1h2.5a1 1 0 0 1 .98.8L8.86 6H19a1 1 0 0 1 .96 1.27l-2.5 8.76A3 3 0 0 1 14.58 18H9.1a3 3 0 0 1-2.9-2.26L4.23 6.59A1 1 0 0 1 5 5Zm4.4 11H14.6a1 1 0 0 0 .96-.74L17.8 8H9.44l-1.2 6.26A1 1 0 0 0 8.4 16ZM9 20a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2h-4a1 1 0 0 1-1-1Z"/></svg>
+                        Export financials
+                    </a>
+                </div>
             </div>
 
             <div class="stat-grid" style="margin-top:2rem;">
@@ -162,6 +277,7 @@ $employees = get_users_by_role($pdo, 'employee');
                             <th>Role</th>
                             <th>Title</th>
                             <th>Hours logged</th>
+                            <th>Entries</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -171,10 +287,11 @@ $employees = get_users_by_role($pdo, 'employee');
                                 <td><?= ucfirst($row['role']) ?></td>
                                 <td><?= htmlspecialchars($row['title'] ?? '—') ?></td>
                                 <td><?= number_format($row['minutes'] / 60, 2) ?></td>
+                                <td><?= (int) ($row['entry_count'] ?? 0) ?></td>
                             </tr>
                         <?php endforeach; ?>
                         <?php if (empty($summary)): ?>
-                            <tr><td colspan="3" style="color:var(--muted);">No time entries yet.</td></tr>
+                            <tr><td colspan="5" style="color:var(--muted);">No time entries yet.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
