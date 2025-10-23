@@ -1,15 +1,14 @@
 <?php
-// ==================== SECTION 1: SESSION & AUTHENTICATION ====================
-// Purpose: Handle user authentication, session management, admin checks
-// Dependencies: None
-// Last updated: Current
-// CLAUDE NOTE: For future updates to this section, only provide PHP code between 
-// this marker and SECTION 2 marker. Include session config, auth checks, admin validation.
-// dashboard.php - FIXED VERSION with Enhanced Reporting + CEO Notes
+/**
+ * FOXHOLE - Admin Dashboard
+ * Complete Agency Management System
+ * Redesigned for modern full-stack agency operations
+ */
+
+// ==================== SESSION & AUTHENTICATION ====================
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Session configuration
 $sessionPath = dirname(__FILE__) . '/temp_sessions';
 if (!file_exists($sessionPath)) {
     mkdir($sessionPath, 0755, true);
@@ -20,7 +19,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Simple authentication check - FIXED
+// Authentication check
 if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
     if (isset($_GET['admin_test'])) {
         $_SESSION['authenticated'] = true;
@@ -38,2381 +37,1587 @@ if ($_SESSION['user_role'] !== 'admin' && !isset($_GET['admin_test'])) {
     exit();
 }
 
-// ==================== SECTION 2: DATABASE & CONFIG ====================
-// Purpose: Include database configuration and setup
-// Dependencies: config-2.php
-// CLAUDE NOTE: For future updates to this section, only provide the require statements
-// and any database connection setup code.
+// ==================== DEPENDENCIES ====================
 require_once 'config-2.php';
+require_once 'api_enhanced.php';
 
-// ==================== SECTION 3: ENHANCED API CLASS ====================
-// Purpose: Complete API class with all dashboard methods
-// Dependencies: config-2.php, Database class
-// Contains: getDashboardStats, getDetailedEmployeeReport, getProjectDetailsReport, etc.
-// CLAUDE NOTE: For future updates to this section, provide the ENTIRE class definition
-// from "class EnhancedDashboardAPI {" to the closing "}" - this is the core API logic.
-// Enhanced API class with detailed reporting
-class EnhancedDashboardAPI {
+// ==================== ENHANCED API CLASS ====================
+class AgencyDashboardAPI extends DashboardAPI {
     private $db;
     
     public function __construct() {
+        parent::__construct();
         try {
             $database = new Database();
             $this->db = $database->getConnection();
-            $this->initializeMockData();
         } catch (Exception $e) {
-            error_log("Database connection failed: " . $e->getMessage());
+            error_log("AgencyDashboardAPI: Database connection failed: " . $e->getMessage());
             $this->db = null;
         }
     }
     
-    private function initializeMockData() {
-        if (!$this->db) return;
-        
-        try {
-            // Check if we have data
-            $stmt = $this->db->query("SELECT COUNT(*) as count FROM employees");
-            $result = $stmt->fetch();
-            
-            if ($result['count'] == 0) {
-                // Insert mock employees
-                $employees = [
-                    ['John Doe', 'john@neofox.com', 'Lead Developer', 'employee', 'active'],
-                    ['Sarah Wilson', 'sarah@neofox.com', 'Senior Designer', 'employee', 'active'],
-                    ['Mike Johnson', 'mike@neofox.com', 'Video Editor', 'employee', 'busy'],
-                    ['Emily Davis', 'emily@neofox.com', 'Project Manager', 'employee', 'active'],
-                    ['Alex Chen', 'alex@neofox.com', 'Motion Designer', 'freelancer', 'away'],
-                    ['Lisa Park', 'lisa@neofox.com', 'Social Media Manager', 'employee', 'active'],
-                    ['David Kim', 'david@neofox.com', 'Content Writer', 'freelancer', 'active'],
-                    ['Maya Patel', 'maya@neofox.com', 'UI/UX Designer', 'employee', 'active']
-                ];
-                
-                foreach ($employees as $emp) {
-                    $stmt = $this->db->prepare("INSERT INTO employees (name, email, role, type, status, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                    $stmt->execute($emp);
-                }
-                
-                // Insert mock projects
-                $projects = [
-                    ['Nike Campaign 2024', 'Nike Inc', 'Video campaign for new product launch', 'high', 'active', '2024-01-15', '2024-03-30'],
-                    ['TechCorp Website Redesign', 'TechCorp Ltd', 'Complete website overhaul with new branding', 'urgent', 'active', '2024-02-01', '2024-04-15'],
-                    ['Local Restaurant Branding', 'Pizza Palace', 'Logo design and brand identity package', 'medium', 'planning', '2024-03-01', '2024-05-30'],
-                    ['E-commerce Platform', 'ShopEasy', 'Custom e-commerce solution development', 'high', 'active', '2024-01-10', '2024-06-30']
-                ];
-                
-                foreach ($projects as $proj) {
-                    $stmt = $this->db->prepare("INSERT INTO projects (name, client, description, priority, status, start_date, end_date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-                    $stmt->execute($proj);
-                }
-                
-                // Insert mock tasks with realistic data
-                $tasks = [
-                    [1, 1, 'Create hero video concept', 'Video concept development for Nike campaign', 'completed', 'high', 8.0, 7.5, '2024-02-15'],
-                    [1, 1, 'Film main product shots', 'Professional product photography', 'in_progress', 'high', 12.0, 8.0, '2024-02-20'],
-                    [2, 2, 'Design homepage mockup', 'Create responsive homepage design', 'completed', 'urgent', 16.0, 18.0, '2024-02-10'],
-                    [2, 2, 'Develop frontend components', 'Build reusable React components', 'in_progress', 'urgent', 24.0, 15.0, '2024-02-25'],
-                    [3, 3, 'Logo design concepts', 'Create 5 logo variations', 'completed', 'medium', 6.0, 5.5, '2024-03-05'],
-                    [4, 4, 'Database schema design', 'Design database structure', 'completed', 'high', 10.0, 12.0, '2024-01-20'],
-                    [4, 4, 'Payment gateway integration', 'Integrate Stripe payment system', 'todo', 'high', 15.0, 0.0, '2024-03-15'],
-                    [5, 1, 'Edit promotional video', 'Final video editing and color grading', 'review', 'high', 20.0, 18.5, '2024-02-18'],
-                    [6, 2, 'Social media assets', 'Create social media post templates', 'in_progress', 'medium', 8.0, 6.0, '2024-02-22'],
-                    [7, 3, 'Brand guidelines document', 'Write comprehensive brand guidelines', 'todo', 'medium', 12.0, 0.0, '2024-03-10']
-                ];
-                
-                foreach ($tasks as $task) {
-                    $stmt = $this->db->prepare("INSERT INTO tasks (employee_id, project_id, title, description, status, priority, estimated_hours, hours_logged, due_date, created_at, last_activity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
-                    $stmt->execute($task);
-                }
-                
-                // Insert activity log
-                $activities = [
-                    [1, 'Completed task "Create hero video concept"', 'task_complete'],
-                    [2, 'Started working on homepage design', 'task_start'],
-                    [3, 'Submitted logo concepts for review', 'task_complete'],
-                    [4, 'Updated project timeline', 'general'],
-                    [5, 'Status changed to Away', 'status_change']
-                ];
-                
-                foreach ($activities as $activity) {
-                    $stmt = $this->db->prepare("INSERT INTO activity_log (employee_id, activity, type, created_at) VALUES (?, ?, ?, NOW() - INTERVAL FLOOR(RAND() * 60) MINUTE)");
-                    $stmt->execute($activity);
-                }
-            }
-        } catch (Exception $e) {
-            error_log("Error initializing mock data: " . $e->getMessage());
-        }
-    }
-    
+    // Get comprehensive dashboard statistics
     public function getDashboardStats() {
-        if (!$this->db) {
-            return [
-                'active_employees' => 6,
-                'total_employees' => 8,
-                'completed_tasks' => 4,
-                'urgent_tasks' => 2,
-                'overdue_tasks' => 1,
-                'avg_productivity' => 87,
-                'total_hours_logged' => 95.5,
-                'projects_on_track' => 3,
-                'projects_at_risk' => 1
-            ];
-        }
+        $stats = [
+            'employees' => [
+                'total' => 0,
+                'active' => 0,
+                'busy' => 0,
+                'away' => 0
+            ],
+            'projects' => [
+                'total' => 0,
+                'active' => 0,
+                'planning' => 0,
+                'completed' => 0,
+                'on_hold' => 0
+            ],
+            'tasks' => [
+                'total' => 0,
+                'completed' => 0,
+                'in_progress' => 0,
+                'todo' => 0,
+                'overdue' => 0
+            ],
+            'time' => [
+                'total_hours' => 0,
+                'billable_hours' => 0,
+                'this_week' => 0,
+                'this_month' => 0
+            ],
+            'financial' => [
+                'revenue_this_month' => 0,
+                'pending_invoices' => 0,
+                'paid_invoices' => 0
+            ],
+            'performance' => [
+                'avg_efficiency' => 0,
+                'projects_on_time' => 0,
+                'client_satisfaction' => 0
+            ]
+        ];
+        
+        if (!$this->db) return $stats;
         
         try {
-            $stats = [];
-            
-            $stmt = $this->db->query("SELECT COUNT(*) as count FROM employees WHERE status = 'active'");
-            $stats['active_employees'] = $stmt->fetch()['count'];
-            
-            $stmt = $this->db->query("SELECT COUNT(*) as count FROM employees");
-            $stats['total_employees'] = $stmt->fetch()['count'];
-            
-            $stmt = $this->db->query("SELECT COUNT(*) as count FROM tasks WHERE status = 'completed'");
-            $stats['completed_tasks'] = $stmt->fetch()['count'];
-            
-            $stmt = $this->db->query("SELECT COUNT(*) as count FROM tasks WHERE priority = 'urgent' AND status != 'completed'");
-            $stats['urgent_tasks'] = $stmt->fetch()['count'];
-            
-            $stmt = $this->db->query("SELECT COUNT(*) as count FROM tasks WHERE due_date < CURDATE() AND status != 'completed'");
-            $stats['overdue_tasks'] = $stmt->fetch()['count'];
-            
-            $stmt = $this->db->query("SELECT AVG(CASE WHEN estimated_hours > 0 THEN (hours_logged / estimated_hours) * 100 ELSE 75 END) as avg_productivity FROM tasks WHERE status = 'completed'");
-            $result = $stmt->fetch();
-            $stats['avg_productivity'] = round($result['avg_productivity'] ?? 75);
-            
-            $stmt = $this->db->query("SELECT SUM(hours_logged) as total_hours FROM tasks");
-            $stats['total_hours_logged'] = round($stmt->fetch()['total_hours'] ?? 0, 1);
-            
-            $stmt = $this->db->query("SELECT COUNT(*) as count FROM projects WHERE status = 'active'");
-            $stats['projects_on_track'] = $stmt->fetch()['count'];
-            
-            $stmt = $this->db->query("SELECT COUNT(*) as count FROM projects WHERE priority = 'urgent'");
-            $stats['projects_at_risk'] = $stmt->fetch()['count'];
-            
-            return $stats;
-        } catch (Exception $e) {
-            error_log("Error getting dashboard stats: " . $e->getMessage());
-            return [
-                'active_employees' => 0,
-                'total_employees' => 0,
-                'completed_tasks' => 0,
-                'urgent_tasks' => 0,
-                'overdue_tasks' => 0,
-                'avg_productivity' => 0,
-                'total_hours_logged' => 0,
-                'projects_on_track' => 0,
-                'projects_at_risk' => 0
-            ];
-        }
-    }
-    
-    public function getDetailedEmployeeReport() {
-        if (!$this->db) {
-            return [
-                [
-                    'id' => 1,
-                    'name' => 'John Doe',
-                    'role' => 'Lead Developer',
-                    'type' => 'employee',
-                    'status' => 'active',
-                    'total_tasks' => 5,
-                    'completed_tasks' => 3,
-                    'in_progress_tasks' => 1,
-                    'overdue_tasks' => 0,
-                    'total_hours' => 45.5,
-                    'avg_hours_per_task' => 9.1,
-                    'efficiency_score' => 92,
-                    'current_projects' => ['Nike Campaign', 'TechCorp Website'],
-                    'performance_trend' => 'up',
-                    'workload_status' => 'optimal'
-                ],
-                [
-                    'id' => 2,
-                    'name' => 'Sarah Wilson',
-                    'role' => 'Senior Designer',
-                    'type' => 'employee',
-                    'status' => 'active',
-                    'total_tasks' => 4,
-                    'completed_tasks' => 2,
-                    'in_progress_tasks' => 2,
-                    'overdue_tasks' => 1,
-                    'total_hours' => 38.0,
-                    'avg_hours_per_task' => 9.5,
-                    'efficiency_score' => 85,
-                    'current_projects' => ['TechCorp Website'],
-                    'performance_trend' => 'stable',
-                    'workload_status' => 'high'
-                ]
-            ];
-        }
-        
-        try {
+            // Employee stats
             $stmt = $this->db->query("
                 SELECT 
-                    e.*,
-                    COUNT(t.id) as total_tasks,
-                    COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed_tasks,
-                    COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_tasks,
-                    COUNT(CASE WHEN t.due_date < CURDATE() AND t.status != 'completed' THEN 1 END) as overdue_tasks,
-                    SUM(t.hours_logged) as total_hours,
-                    AVG(t.hours_logged) as avg_hours_per_task,
-                    AVG(CASE WHEN t.status = 'completed' AND t.estimated_hours > 0 
-                        THEN (t.hours_logged / t.estimated_hours) * 100 
-                        ELSE NULL END) as efficiency_score,
-                    GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as current_projects
-                FROM employees e
-                LEFT JOIN tasks t ON e.id = t.employee_id
-                LEFT JOIN projects p ON t.project_id = p.id AND t.status != 'completed'
-                GROUP BY e.id
-                ORDER BY e.name
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+                    SUM(CASE WHEN status = 'busy' THEN 1 ELSE 0 END) as busy,
+                    SUM(CASE WHEN status = 'away' THEN 1 ELSE 0 END) as away
+                FROM employees
             ");
+            $empStats = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stats['employees'] = $empStats;
             
-            $employees = $stmt->fetchAll();
+            // Project stats
+            $stmt = $this->db->query("
+                SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+                    SUM(CASE WHEN status = 'planning' THEN 1 ELSE 0 END) as planning,
+                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN status = 'on_hold' THEN 1 ELSE 0 END) as on_hold
+                FROM projects
+            ");
+            $projStats = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stats['projects'] = $projStats;
             
-            foreach ($employees as &$emp) {
-                $emp['efficiency_score'] = round($emp['efficiency_score'] ?? 75);
-                $emp['total_hours'] = round($emp['total_hours'] ?? 0, 1);
-                $emp['avg_hours_per_task'] = round($emp['avg_hours_per_task'] ?? 0, 1);
-                $emp['current_projects'] = $emp['current_projects'] ? explode(', ', $emp['current_projects']) : [];
-                
-                // Determine performance trend
-                $emp['performance_trend'] = $emp['efficiency_score'] >= 90 ? 'up' : 
-                                          ($emp['efficiency_score'] >= 75 ? 'stable' : 'down');
-                
-                // Determine workload status
-                $workload = $emp['total_tasks'] - $emp['completed_tasks'];
-                $emp['workload_status'] = $workload >= 5 ? 'overloaded' : 
-                                        ($workload >= 3 ? 'high' : 
-                                        ($workload >= 1 ? 'optimal' : 'light'));
+            // Task stats
+            $stmt = $this->db->query("
+                SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+                    SUM(CASE WHEN status = 'todo' THEN 1 ELSE 0 END) as todo,
+                    SUM(CASE WHEN due_date < CURDATE() AND status != 'completed' THEN 1 ELSE 0 END) as overdue
+                FROM tasks
+            ");
+            $taskStats = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stats['tasks'] = $taskStats;
+            
+            // Time stats
+            $stmt = $this->db->query("
+                SELECT 
+                    COALESCE(SUM(hours_logged), 0) as total_hours,
+                    COALESCE(SUM(CASE WHEN WEEK(last_activity) = WEEK(CURDATE()) THEN hours_logged ELSE 0 END), 0) as this_week,
+                    COALESCE(SUM(CASE WHEN MONTH(last_activity) = MONTH(CURDATE()) THEN hours_logged ELSE 0 END), 0) as this_month
+                FROM tasks
+            ");
+            $timeStats = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stats['time'] = array_merge($stats['time'], $timeStats);
+            $stats['time']['billable_hours'] = round($timeStats['total_hours'] * 0.75); // Estimate 75% billable
+            
+            // Performance metrics
+            $stmt = $this->db->query("
+                SELECT 
+                    COALESCE(AVG(CASE WHEN status = 'completed' AND estimated_hours > 0 
+                        THEN (hours_logged / estimated_hours) * 100 END), 0) as avg_efficiency
+                FROM tasks
+            ");
+            $perfStats = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stats['performance']['avg_efficiency'] = round($perfStats['avg_efficiency']);
+            
+            // Projects on time
+            $stmt = $this->db->query("
+                SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN end_date >= CURDATE() OR status = 'completed' THEN 1 ELSE 0 END) as on_time
+                FROM projects
+                WHERE status IN ('active', 'completed')
+            ");
+            $onTimeStats = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($onTimeStats['total'] > 0) {
+                $stats['performance']['projects_on_time'] = round(($onTimeStats['on_time'] / $onTimeStats['total']) * 100);
             }
             
-            return $employees;
         } catch (Exception $e) {
-            error_log("Error getting employee report: " . $e->getMessage());
-            return [];
+            error_log("getDashboardStats: Error - " . $e->getMessage());
         }
+        
+        return $stats;
     }
     
-    public function getProjectDetailsReport() {
-        if (!$this->db) {
-            return [
-                [
-                    'id' => 1,
-                    'name' => 'Nike Campaign 2024',
-                    'client' => 'Nike Inc',
-                    'priority' => 'high',
-                    'status' => 'active',
-                    'progress' => 65,
-                    'total_tasks' => 3,
-                    'completed_tasks' => 1,
-                    'team_size' => 2,
-                    'total_hours' => 33.5,
-                    'estimated_hours' => 40.0,
-                    'efficiency' => 84,
-                    'days_remaining' => 45,
-                    'budget_status' => 'on_track',
-                    'team_members' => ['John Doe', 'Mike Johnson']
-                ]
-            ];
-        }
+    // Get project performance metrics
+    public function getProjectMetrics() {
+        if (!$this->db) return [];
         
         try {
             $stmt = $this->db->query("
                 SELECT 
                     p.*,
-                    COUNT(t.id) as total_tasks,
-                    COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed_tasks,
+                    COUNT(DISTINCT t.id) as total_tasks,
+                    COUNT(DISTINCT CASE WHEN t.status = 'completed' THEN t.id END) as completed_tasks,
+                    COALESCE(SUM(t.hours_logged), 0) as hours_logged,
+                    COALESCE(SUM(t.estimated_hours), 0) as estimated_hours,
+                    COALESCE(AVG(CASE WHEN t.status = 'completed' AND t.estimated_hours > 0 
+                        THEN (t.hours_logged / t.estimated_hours) * 100 END), 0) as efficiency,
                     COUNT(DISTINCT t.employee_id) as team_size,
-                    SUM(t.hours_logged) as total_hours,
-                    SUM(t.estimated_hours) as estimated_hours,
-                    GROUP_CONCAT(DISTINCT e.name SEPARATOR ', ') as team_members,
                     DATEDIFF(p.end_date, CURDATE()) as days_remaining
                 FROM projects p
                 LEFT JOIN tasks t ON p.id = t.project_id
-                LEFT JOIN employees e ON t.employee_id = e.id
+                WHERE p.status IN ('active', 'planning')
                 GROUP BY p.id
-                ORDER BY p.priority = 'urgent' DESC, p.priority = 'high' DESC, p.created_at DESC
+                ORDER BY 
+                    CASE p.priority 
+                        WHEN 'urgent' THEN 1
+                        WHEN 'high' THEN 2
+                        WHEN 'medium' THEN 3
+                        ELSE 4
+                    END,
+                    p.end_date ASC
             ");
-            
-            $projects = $stmt->fetchAll();
-            
-            foreach ($projects as &$proj) {
-                $proj['progress'] = $proj['total_tasks'] > 0 ? 
-                    round(($proj['completed_tasks'] / $proj['total_tasks']) * 100) : 0;
-                $proj['efficiency'] = $proj['estimated_hours'] > 0 ? 
-                    round(($proj['total_hours'] / $proj['estimated_hours']) * 100) : 100;
-                $proj['total_hours'] = round($proj['total_hours'] ?? 0, 1);
-                $proj['estimated_hours'] = round($proj['estimated_hours'] ?? 0, 1);
-                $proj['team_members'] = $proj['team_members'] ? explode(', ', $proj['team_members']) : [];
-                $proj['budget_status'] = $proj['efficiency'] <= 110 ? 'on_track' : 'over_budget';
-                $proj['days_remaining'] = max(0, $proj['days_remaining'] ?? 0);
-            }
-            
-            return $projects;
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            error_log("Error getting project report: " . $e->getMessage());
+            error_log("getProjectMetrics: Error - " . $e->getMessage());
             return [];
         }
     }
     
-    public function getProductivityAnalytics() {
-        if (!$this->db) {
-            return [
-                'top_performers' => [
-                    ['name' => 'John Doe', 'efficiency' => 92, 'completed_tasks' => 8],
-                    ['name' => 'Sarah Wilson', 'efficiency' => 89, 'completed_tasks' => 6]
-                ],
-                'bottom_performers' => [
-                    ['name' => 'Alex Chen', 'efficiency' => 65, 'completed_tasks' => 2]
-                ],
-                'team_velocity' => [
-                    ['week' => 'Week 1', 'completed' => 12, 'planned' => 15],
-                    ['week' => 'Week 2', 'completed' => 18, 'planned' => 16]
-                ]
-            ];
-        }
+    // Get employee productivity data
+    public function getEmployeeProductivity() {
+        if (!$this->db) return [];
         
         try {
-            // Top performers
             $stmt = $this->db->query("
                 SELECT 
+                    e.id,
                     e.name,
-                    COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed_tasks,
-                    AVG(CASE WHEN t.status = 'completed' AND t.estimated_hours > 0 
-                        THEN (t.hours_logged / t.estimated_hours) * 100 
-                        ELSE NULL END) as efficiency
+                    e.role,
+                    e.status,
+                    COUNT(DISTINCT t.id) as total_tasks,
+                    COUNT(DISTINCT CASE WHEN t.status = 'completed' THEN t.id END) as completed_tasks,
+                    COUNT(DISTINCT CASE WHEN t.status = 'in_progress' THEN t.id END) as active_tasks,
+                    COUNT(DISTINCT CASE WHEN t.due_date < CURDATE() AND t.status != 'completed' THEN t.id END) as overdue_tasks,
+                    COALESCE(SUM(t.hours_logged), 0) as total_hours,
+                    COALESCE(SUM(CASE WHEN WEEK(t.last_activity) = WEEK(CURDATE()) THEN t.hours_logged ELSE 0 END), 0) as week_hours,
+                    COALESCE(AVG(CASE WHEN t.status = 'completed' AND t.estimated_hours > 0 
+                        THEN (t.hours_logged / t.estimated_hours) * 100 END), 100) as efficiency_ratio,
+                    COUNT(DISTINCT t.project_id) as projects_count,
+                    MAX(t.last_activity) as last_activity
                 FROM employees e
                 LEFT JOIN tasks t ON e.id = t.employee_id
-                GROUP BY e.id, e.name
-                HAVING completed_tasks > 0
-                ORDER BY efficiency DESC, completed_tasks DESC
-                LIMIT 5
+                GROUP BY e.id
+                ORDER BY efficiency_ratio DESC, completed_tasks DESC
             ");
-            $top_performers = $stmt->fetchAll();
-            
-            // Bottom performers
-            $stmt = $this->db->query("
-                SELECT 
-                    e.name,
-                    COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed_tasks,
-                    AVG(CASE WHEN t.status = 'completed' AND t.estimated_hours > 0 
-                        THEN (t.hours_logged / t.estimated_hours) * 100 
-                        ELSE NULL END) as efficiency
-                FROM employees e
-                LEFT JOIN tasks t ON e.id = t.employee_id
-                GROUP BY e.id, e.name
-                HAVING efficiency < 80 OR (efficiency IS NULL AND completed_tasks = 0)
-                ORDER BY efficiency ASC, completed_tasks ASC
-                LIMIT 3
-            ");
-            $bottom_performers = $stmt->fetchAll();
-            
-            return [
-                'top_performers' => array_map(function($p) {
-                    $p['efficiency'] = round($p['efficiency'] ?? 0);
-                    return $p;
-                }, $top_performers),
-                'bottom_performers' => array_map(function($p) {
-                    $p['efficiency'] = round($p['efficiency'] ?? 0);
-                    return $p;
-                }, $bottom_performers),
-                'team_velocity' => [
-                    ['week' => 'Week 1', 'completed' => 12, 'planned' => 15],
-                    ['week' => 'Week 2', 'completed' => 18, 'planned' => 16],
-                    ['week' => 'Week 3', 'completed' => 15, 'planned' => 14],
-                    ['week' => 'Week 4', 'completed' => 22, 'planned' => 20]
-                ]
-            ];
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            error_log("Error getting productivity analytics: " . $e->getMessage());
-            return ['top_performers' => [], 'bottom_performers' => [], 'team_velocity' => []];
+            error_log("getEmployeeProductivity: Error - " . $e->getMessage());
+            return [];
         }
     }
     
-    public function getRecentActivity($limit = 10) {
-        if (!$this->db) {
-            return [
-                ['activity' => 'John Doe completed "Hero video concept"', 'time_formatted' => '5m ago'],
-                ['activity' => 'Sarah Wilson started "Homepage design"', 'time_formatted' => '15m ago'],
-                ['activity' => 'Project "Nike Campaign" updated', 'time_formatted' => '1h ago']
-            ];
-        }
+    // Get recent activity feed
+    public function getRecentActivity($limit = 20) {
+        if (!$this->db) return [];
         
         try {
             $stmt = $this->db->prepare("
                 SELECT 
-                    al.activity,
-                    CASE 
-                        WHEN al.created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR) 
-                        THEN CONCAT(TIMESTAMPDIFF(MINUTE, al.created_at, NOW()), 'm ago')
-                        WHEN al.created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY) 
-                        THEN CONCAT(TIMESTAMPDIFF(HOUR, al.created_at, NOW()), 'h ago')
-                        ELSE DATE_FORMAT(al.created_at, '%M %d at %h:%i%p')
-                    END as time_formatted
-                FROM activity_log al
-                ORDER BY al.created_at DESC
+                    a.*,
+                    e.name as employee_name,
+                    e.role as employee_role
+                FROM activity_log a
+                LEFT JOIN employees e ON a.employee_id = e.id
+                ORDER BY a.created_at DESC
                 LIMIT ?
             ");
             $stmt->execute([$limit]);
-            return $stmt->fetchAll();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            error_log("Error getting recent activity: " . $e->getMessage());
+            error_log("getRecentActivity: Error - " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    // Get upcoming deadlines
+    public function getUpcomingDeadlines($days = 7) {
+        if (!$this->db) return [];
+        
+        try {
+            $stmt = $this->db->prepare("
+                SELECT 
+                    t.*,
+                    e.name as employee_name,
+                    p.name as project_name,
+                    p.client as client_name,
+                    DATEDIFF(t.due_date, CURDATE()) as days_until_due
+                FROM tasks t
+                LEFT JOIN employees e ON t.employee_id = e.id
+                LEFT JOIN projects p ON t.project_id = p.id
+                WHERE t.status != 'completed'
+                AND t.due_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)
+                ORDER BY t.due_date ASC, t.priority DESC
+            ");
+            $stmt->execute([$days]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("getUpcomingDeadlines: Error - " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    // Get team capacity
+    public function getTeamCapacity() {
+        if (!$this->db) return [];
+        
+        try {
+            $stmt = $this->db->query("
+                SELECT 
+                    e.id,
+                    e.name,
+                    e.role,
+                    e.status,
+                    COUNT(DISTINCT CASE WHEN t.status IN ('in_progress', 'todo') THEN t.id END) as active_tasks,
+                    COALESCE(SUM(CASE WHEN t.status IN ('in_progress', 'todo') THEN t.estimated_hours ELSE 0 END), 0) as pending_hours,
+                    COALESCE(SUM(CASE WHEN WEEK(t.last_activity) = WEEK(CURDATE()) THEN t.hours_logged ELSE 0 END), 0) as week_hours,
+                    CASE 
+                        WHEN pending_hours < 20 THEN 'available'
+                        WHEN pending_hours < 40 THEN 'normal'
+                        WHEN pending_hours < 60 THEN 'busy'
+                        ELSE 'overloaded'
+                    END as capacity_status
+                FROM employees e
+                LEFT JOIN tasks t ON e.id = t.employee_id
+                WHERE e.status IN ('active', 'busy')
+                GROUP BY e.id
+                ORDER BY capacity_status, pending_hours ASC
+            ");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("getTeamCapacity: Error - " . $e->getMessage());
             return [];
         }
     }
 }
 
-// ==================== SECTION 4: DATA INITIALIZATION ====================
-// Purpose: Initialize API and fetch all dashboard data
-// Dependencies: EnhancedDashboardAPI class
-// CLAUDE NOTE: For future updates to this section, provide the API initialization
-// and all data fetching calls. This determines what data is available to the HTML sections.
-// Initialize API
-$api = new EnhancedDashboardAPI();
+// ==================== INITIALIZE API ====================
+$agencyAPI = new AgencyDashboardAPI();
+$dashboardStats = $agencyAPI->getDashboardStats();
+$employees = $agencyAPI->getEmployees();
+$projectMetrics = $agencyAPI->getProjectMetrics();
+$productivity = $agencyAPI->getEmployeeProductivity();
+$recentActivity = $agencyAPI->getRecentActivity(15);
+$upcomingDeadlines = $agencyAPI->getUpcomingDeadlines(7);
+$teamCapacity = $agencyAPI->getTeamCapacity();
 
-// Get all data
-$stats = $api->getDashboardStats();
-$employeeReport = $api->getDetailedEmployeeReport();
-$projectReport = $api->getProjectDetailsReport();
-$productivity = $api->getProductivityAnalytics();
-$recentActivity = $api->getRecentActivity();
-
-// ==================== SECTION 5: AJAX REQUEST HANDLERS ====================
-// Purpose: Handle POST requests for real-time updates
-// Dependencies: EnhancedDashboardAPI
-// CLAUDE NOTE: For future updates to this section, provide the entire POST request
-// handling block including the switch statement and all ajax response logic.
-// Handle AJAX requests
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    header('Content-Type: application/json');
-    
-    switch ($_POST['action']) {
-        case 'refresh_data':
-            echo json_encode([
-                'success' => true,
-                'stats' => $api->getDashboardStats(),
-                'employees' => $api->getDetailedEmployeeReport()
-            ]);
-            break;
-            
-        default:
-            echo json_encode(['success' => false, 'error' => 'Invalid action']);
-    }
-    exit();
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- ==================== SECTION 6: HTML DOCTYPE & HEAD ==================== -->
-    <!-- Purpose: HTML structure, meta tags, external resources -->
-    <!-- Dependencies: None -->
-    <!-- CLAUDE NOTE: For future updates to this section, provide the complete <head> -->
-    <!-- section including meta tags, title, and external resource links (fonts, icons). -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Foxhole - Enhanced Admin Dashboard</title>
+    <title>Admin Dashboard - Foxhole Agency Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="assets/css/main.css" rel="stylesheet">
     
     <style>
-        /* ==================== SECTION 7: CSS VARIABLES & ROOT STYLES ==================== */
-        /* Purpose: CSS custom properties, color system, base styles */
-        /* Dependencies: None */
-        /* CLAUDE NOTE: For future updates to this section, provide the :root variable */
-        /* definitions and base element styles (*, body, html). Color system updates go here. */
-        :root {
-            --primary: #4F46E5;
-            --primary-light: #6366F1;
-            --secondary: #10B981;
-            --warning: #F59E0B;
-            --danger: #EF4444;
-            --success: #10B981;
-            --info: #3B82F6;
-            
-            --gray-50: #F8FAFC;
-            --gray-100: #F1F5F9;
-            --gray-200: #E2E8F0;
-            --gray-300: #CBD5E1;
-            --gray-400: #94A3B8;
-            --gray-500: #64748B;
-            --gray-600: #475569;
-            --gray-700: #334155;
-            --gray-800: #1E293B;
-            --gray-900: #0F172A;
-            
-            --bg-primary: #FAFAFB;
-            --bg-secondary: #FFFFFF;
-            
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            
-            --radius-md: 12px;
-            --radius-lg: 16px;
-            --radius-xl: 24px;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg-primary);
-            color: var(--gray-900);
-            line-height: 1.5;
-            font-size: 14px;
-        }
-
-        .dashboard-container {
+        /* Dashboard-specific styles */
+        .dashboard-tabs {
             display: flex;
-            min-height: 100vh;
-        }
-
-        /* ==================== SECTION 8: SIDEBAR STYLES ==================== */
-        /* Purpose: Navigation sidebar styling */
-        /* Dependencies: CSS variables */
-        /* CLAUDE NOTE: For future updates to this section, provide all CSS rules */
-        /* for .sidebar, .sidebar-header, .nav-menu, .nav-item, .nav-link, etc. */
-        .sidebar {
-            width: 280px;
-            background: var(--bg-secondary);
-            border-right: 2px solid var(--gray-200);
-            padding: 2rem 0;
-            position: fixed;
-            height: 100vh;
-            overflow-y: auto;
-            z-index: 1000;
-            box-shadow: var(--shadow-lg);
-        }
-
-        .sidebar-header {
-            padding: 0 2rem 2rem 2rem;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-xl);
             border-bottom: 2px solid var(--gray-200);
-            margin-bottom: 2rem;
+            overflow-x: auto;
         }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            font-size: 28px;
-            font-weight: 900;
-            color: var(--primary);
-        }
-
-        .logo-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            border-radius: var(--radius-lg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 24px;
-            box-shadow: var(--shadow-md);
-        }
-
-        .nav-menu {
-            list-style: none;
-            padding: 0 1rem;
-        }
-
-        .nav-item {
-            margin-bottom: 8px;
-        }
-
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 16px 20px;
-            color: var(--gray-600);
-            text-decoration: none;
-            border-radius: var(--radius-md);
-            transition: all 0.3s ease;
-            font-weight: 600;
-            font-size: 15px;
-            cursor: pointer;
-        }
-
-        .nav-link:hover, .nav-link.active {
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            color: white;
-            transform: translateX(8px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .nav-link i {
-            width: 24px;
-            text-align: center;
-            font-size: 18px;
-        }
-
-        .nav-badge {
-            background: var(--danger);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 700;
-            margin-left: auto;
-        }
-
-        /* ==================== SECTION 9: MAIN CONTENT STYLES ==================== */
-        /* Purpose: Main dashboard area styling */
-        /* Dependencies: CSS variables */
-        /* CLAUDE NOTE: For future updates to this section, provide all CSS rules */
-        /* for .main-content, .top-bar, .page-header, .content-area, etc. */
-        .main-content {
-            flex: 1;
-            margin-left: 280px;
-            background: var(--bg-primary);
-            min-height: 100vh;
-        }
-
-        .top-bar {
-            background: var(--bg-secondary);
-            border-bottom: 2px solid var(--gray-200);
-            padding: 1.5rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .page-header h1 {
-            font-size: 32px;
-            font-weight: 800;
-            color: var(--gray-900);
-            line-height: 1.2;
-        }
-
-        .page-header p {
-            font-size: 16px;
-            color: var(--gray-600);
-            font-weight: 500;
-        }
-
-        .top-actions {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .content-area {
-            padding: 2rem;
-            max-width: 100%;
-        }
-
-        /* ==================== SECTION 10: COMPONENT STYLES ==================== */
-        /* Purpose: Cards, buttons, tables, metrics styling */
-        /* Dependencies: CSS variables */
-        /* CLAUDE NOTE: For future updates to this section, provide all CSS rules for */
-        /* buttons, metric cards, tables, badges, progress bars, and other UI components. */
-        .btn {
-            padding: 12px 24px;
+        
+        .tab-btn {
+            padding: var(--spacing-md) var(--spacing-lg);
             border: none;
-            border-radius: var(--radius-md);
-            font-weight: 700;
+            background: transparent;
+            border-bottom: 3px solid transparent;
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: var(--font-size-sm);
             cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-flex;
+            transition: all var(--transition-fast);
+            white-space: nowrap;
+            display: flex;
             align-items: center;
-            gap: 10px;
-            text-decoration: none;
-            font-size: 14px;
+            gap: var(--spacing-sm);
         }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            color: white;
+        
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: var(--gray-50);
         }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+        
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
         }
-
-        .btn-secondary {
-            background: var(--gray-100);
-            color: var(--gray-700);
-            border: 2px solid var(--gray-300);
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
         }
-
-        .btn-secondary:hover {
-            background: var(--gray-200);
+        
+        .tab-content.active {
+            display: block;
         }
-
-        /* Metrics Grid */
-        .metrics-grid {
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 24px;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
         }
-
+        
         .metric-card {
-            background: var(--bg-secondary);
+            background: white;
             border-radius: var(--radius-lg);
-            padding: 2rem;
-            box-shadow: var(--shadow-md);
-            border: 2px solid var(--gray-200);
-            transition: all 0.3s ease;
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-sm);
+            transition: all var(--transition-fast);
             position: relative;
             overflow: hidden;
         }
-
-        .metric-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-xl);
-            border-color: var(--primary);
-        }
-
+        
         .metric-card::before {
             content: '';
             position: absolute;
             top: 0;
             left: 0;
-            right: 0;
-            height: 6px;
-            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            width: 4px;
+            height: 100%;
+            background: var(--metric-color, var(--primary));
         }
-
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        
         .metric-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
+            align-items: flex-start;
+            margin-bottom: var(--spacing-md);
         }
-
-        .metric-icon {
-            width: 64px;
-            height: 64px;
-            border-radius: var(--radius-lg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            color: white;
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            box-shadow: var(--shadow-md);
-        }
-
-        .metric-number {
-            font-size: 48px;
-            font-weight: 900;
-            color: var(--gray-900);
-            margin-bottom: 8px;
-            line-height: 1;
-        }
-
+        
         .metric-label {
-            font-size: 18px;
-            color: var(--gray-600);
-            font-weight: 600;
-            margin-bottom: 1rem;
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            font-weight: 500;
         }
-
-        .metric-change {
-            font-size: 14px;
-            font-weight: 700;
-            padding: 8px 16px;
-            border-radius: 20px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .metric-change.positive { 
-            color: var(--success); 
-            background: rgba(16, 185, 129, 0.1);
-        }
-
-        .metric-change.negative { 
-            color: var(--danger); 
-            background: rgba(239, 68, 68, 0.1);
-        }
-
-        /* Tab Content */
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        /* Section Cards */
-        .section-card {
-            background: var(--bg-secondary);
-            border-radius: var(--radius-lg);
-            padding: 2rem;
-            box-shadow: var(--shadow-md);
-            border: 2px solid var(--gray-200);
-            margin-bottom: 2rem;
-        }
-
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px solid var(--gray-200);
-        }
-
-        .section-title {
-            font-size: 24px;
-            font-weight: 800;
-            color: var(--gray-900);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        /* Employee Report Table */
-        .report-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: var(--bg-secondary);
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-            box-shadow: var(--shadow-md);
-        }
-
-        .report-table th,
-        .report-table td {
-            padding: 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--gray-200);
-        }
-
-        .report-table th {
-            background: var(--gray-50);
-            font-weight: 700;
-            color: var(--gray-700);
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .report-table tr:hover {
-            background: var(--gray-50);
-        }
-
-        .employee-avatar-mini {
+        
+        .metric-icon {
             width: 40px;
             height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            display: inline-flex;
+            border-radius: var(--radius-md);
+            display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 1.25rem;
             color: white;
+            background: var(--metric-color, var(--primary));
+        }
+        
+        .metric-value {
+            font-size: 2rem;
             font-weight: 700;
-            font-size: 14px;
-            margin-right: 12px;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-xs);
         }
-
-        .status-badge {
-            padding: 6px 12px;
-            border-radius: 16px;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
+        
+        .metric-change {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
         }
-
-        .status-active { background: rgba(22, 163, 74, 0.1); color: var(--success); }
-        .status-busy { background: rgba(220, 38, 38, 0.1); color: var(--danger); }
-        .status-away { background: rgba(234, 88, 12, 0.1); color: var(--warning); }
-
-        .workload-optimal { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-        .workload-high { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
-        .workload-overloaded { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-
-        .performance-score {
-            font-weight: 800;
-            font-size: 16px;
+        
+        .metric-change.positive {
+            color: var(--success);
         }
-
-        .score-excellent { color: var(--success); }
-        .score-good { color: var(--info); }
-        .score-needs-improvement { color: var(--warning); }
-        .score-poor { color: var(--danger); }
-
-        /* Project Cards */
-        .projects-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 2rem;
+        
+        .metric-change.negative {
+            color: var(--danger);
         }
-
+        
         .project-card {
-            background: var(--bg-secondary);
+            background: white;
             border-radius: var(--radius-lg);
-            padding: 2rem;
-            border: 3px solid transparent;
-            box-shadow: var(--shadow-md);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: var(--spacing-md);
+            transition: all var(--transition-fast);
         }
-
-        .project-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 6px;
-            background: var(--gray-300);
-        }
-
-        .project-card.priority-urgent::before { background: linear-gradient(90deg, var(--danger), #F87171); }
-        .project-card.priority-high::before { background: linear-gradient(90deg, var(--warning), #FBBF24); }
-        .project-card.priority-medium::before { background: linear-gradient(90deg, var(--info), #60A5FA); }
-
+        
         .project-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-xl);
-            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
         }
-
+        
         .project-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 1.5rem;
+            margin-bottom: var(--spacing-md);
         }
-
-        .project-name {
-            font-size: 18px;
-            font-weight: 800;
-            margin-bottom: 0.5rem;
-            color: var(--gray-900);
-        }
-
-        .project-client {
-            font-size: 14px;
-            color: var(--gray-600);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .priority-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
+        
+        .project-title {
+            font-size: var(--font-size-lg);
             font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .priority-urgent { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-        .priority-high { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
-        .priority-medium { background: rgba(59, 130, 246, 0.1); color: var(--info); }
-
-        .progress-section {
-            margin-bottom: 1.5rem;
-        }
-
-        .progress-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .progress-text {
-            font-weight: 700;
-            font-size: 16px;
-            color: var(--gray-900);
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 12px;
-            background: var(--gray-200);
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--success), #34D399);
-            border-radius: 6px;
-            transition: width 0.3s ease;
-        }
-
-        .project-metrics {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .project-metric {
-            text-align: center;
-            padding: 12px;
-            background: var(--gray-50);
-            border-radius: var(--radius-md);
-        }
-
-        .project-metric-value {
-            font-weight: 800;
-            font-size: 16px;
-            color: var(--gray-900);
+            color: var(--text-primary);
             margin-bottom: 4px;
         }
-
-        .project-metric-label {
-            font-size: 11px;
-            color: var(--gray-500);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+        
+        .project-client {
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
         }
-
-        /* Performance Cards */
-        .performance-grid {
+        
+        .progress-bar {
+            height: 8px;
+            background: var(--gray-200);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: var(--spacing-md) 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .project-meta {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: var(--spacing-md);
+            padding-top: var(--spacing-md);
+            border-top: 1px solid var(--gray-200);
         }
-
-        .performer-list {
+        
+        .meta-item {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 4px;
         }
-
-        .performer-item {
-            display: flex;
-            align-items: center;
-            padding: 1rem;
+        
+        .meta-label {
+            font-size: var(--font-size-xs);
+            color: var(--text-secondary);
+        }
+        
+        .meta-value {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: var(--font-size-sm);
+        }
+        
+        .employee-table {
+            width: 100%;
+            background: white;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .employee-table th {
             background: var(--gray-50);
-            border-radius: var(--radius-md);
-            border: 2px solid transparent;
-            transition: all 0.3s ease;
+            padding: var(--spacing-md);
+            text-align: left;
+            font-weight: 600;
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--gray-200);
         }
-
-        .performer-item:hover {
-            transform: translateX(4px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .performer-item.top-performer {
-            background: rgba(16, 185, 129, 0.1);
-            border-color: var(--success);
-        }
-
-        .performer-item.bottom-performer {
-            background: rgba(239, 68, 68, 0.1);
-            border-color: var(--danger);
-        }
-
-        .performer-rank {
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            margin-right: 1rem;
-        }
-
-        .performer-avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 700;
-            font-size: 16px;
-            margin-right: 1rem;
-        }
-
-        .performer-info {
-            flex: 1;
-        }
-
-        .performer-name {
-            font-weight: 700;
-            font-size: 15px;
-            color: var(--gray-900);
-            margin-bottom: 2px;
-        }
-
-        .performer-stats {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .performer-stat {
-            text-align: center;
-        }
-
-        .stat-value {
-            display: block;
-            font-weight: 700;
-            font-size: 14px;
-            color: var(--gray-900);
-        }
-
-        .stat-label {
-            font-size: 10px;
-            color: var(--gray-500);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Activity Feed */
-        .activity-feed {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .activity-item {
-            display: flex;
-            align-items: center;
-            padding: 12px 0;
+        
+        .employee-table td {
+            padding: var(--spacing-md);
             border-bottom: 1px solid var(--gray-200);
         }
-
-        .activity-icon {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--success);
-            margin-right: 16px;
-            animation: pulse 3s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.2); }
-        }
-
-        .activity-text {
-            font-size: 14px;
-            color: var(--gray-700);
-            flex: 1;
-            font-weight: 500;
-        }
-
-        .activity-time {
-            font-size: 12px;
-            color: var(--gray-500);
-            font-weight: 600;
-        }
-
-        /* ==================== CEO NOTES SPECIFIC STYLES ==================== */
-        /* ADHD-Friendly CEO Notes Styling */
-        .quick-task-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px;
-            margin-bottom: 8px;
+        
+        .employee-table tr:hover {
             background: var(--gray-50);
-            border: 2px solid transparent;
-            border-radius: 12px;
-            transition: all 0.3s ease;
-            cursor: pointer;
         }
-
-        .quick-task-item:hover {
-            background: var(--gray-100);
-            border-color: var(--primary);
-            transform: translateX(4px);
-        }
-
-        .quick-task-item.completed {
-            opacity: 0.6;
-            background: rgba(16, 185, 129, 0.1);
-            text-decoration: line-through;
-        }
-
-        .quick-task-text {
-            flex: 1;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .quick-task-meta {
-            font-size: 12px;
-            color: var(--gray-500);
-            margin-left: 12px;
-            display: flex;
+        
+        .employee-avatar-sm {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-full);
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            display: inline-flex;
             align-items: center;
-            gap: 8px;
-        }
-
-        .saved-note-item {
-            padding: 16px;
-            margin-bottom: 12px;
-            background: var(--gray-50);
-            border-left: 4px solid var(--primary);
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .saved-note-item:hover {
-            background: var(--gray-100);
-            transform: translateX(4px);
-        }
-
-        .saved-note-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .saved-note-time {
-            font-size: 12px;
-            color: var(--gray-500);
-        }
-
-        .saved-note-content {
-            font-size: 14px;
-            line-height: 1.6;
-            color: var(--gray-700);
-        }
-
-        .delete-btn {
-            background: var(--danger);
+            justify-content: center;
             color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 4px 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-right: var(--spacing-sm);
+        }
+        
+        .capacity-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: var(--radius-full);
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+        }
+        
+        .capacity-available {
+            background: var(--success-light);
+            color: var(--success);
+        }
+        
+        .capacity-normal {
+            background: var(--info-light);
+            color: var(--info);
+        }
+        
+        .capacity-busy {
+            background: var(--warning-light);
+            color: var(--warning);
+        }
+        
+        .capacity-overloaded {
+            background: var(--danger-light);
+            color: var(--danger);
+        }
+        
+        .deadline-card {
+            display: flex;
+            gap: var(--spacing-md);
+            padding: var(--spacing-md);
+            background: white;
+            border-radius: var(--radius-md);
+            border-left: 4px solid var(--deadline-color, var(--primary));
+            margin-bottom: var(--spacing-sm);
+            transition: all var(--transition-fast);
+        }
+        
+        .deadline-card:hover {
+            box-shadow: var(--shadow-sm);
+            transform: translateX(4px);
+        }
+        
+        .deadline-info {
+            flex: 1;
+        }
+        
+        .deadline-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .deadline-meta {
+            font-size: var(--font-size-xs);
+            color: var(--text-secondary);
+        }
+        
+        .deadline-days {
+            text-align: right;
+            font-weight: 700;
+            color: var(--deadline-color);
+        }
+        
+        .quick-action-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+        }
+        
+        .quick-action-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            text-align: center;
             cursor: pointer;
-            font-size: 12px;
-            transition: all 0.3s ease;
+            transition: all var(--transition-fast);
+            border: 2px solid var(--gray-200);
         }
-
-        .delete-btn:hover {
-            background: #dc2626;
-            transform: scale(1.1);
+        
+        .quick-action-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
-
-        /* Quick feedback animation */
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+        
+        .quick-action-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto var(--spacing-md);
+            border-radius: var(--radius-lg);
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            color: white;
         }
-
-        /* ==================== SECTION 11: RESPONSIVE STYLES ==================== */
-        /* Purpose: Mobile and tablet responsive design */
-        /* Dependencies: All previous CSS */
-        /* CLAUDE NOTE: For future updates to this section, provide all @media queries */
-        /* and responsive design rules for mobile, tablet, and desktop breakpoints. */
-        @media (max-width: 1200px) {
-            .performance-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .projects-grid {
-                grid-template-columns: 1fr;
-            }
+        
+        .quick-action-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
         }
-
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-                transition: all 0.3s ease;
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-            
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .top-bar {
-                padding: 1rem;
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-            
-            .content-area {
-                padding: 1rem;
-            }
+        
+        .quick-action-desc {
+            font-size: var(--font-size-xs);
+            color: var(--text-secondary);
+        }
+        
+        .activity-feed {
+            list-style: none;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .activity-item {
+            display: flex;
+            gap: var(--spacing-md);
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--gray-200);
+            transition: background var(--transition-fast);
+        }
+        
+        .activity-item:hover {
+            background: var(--gray-50);
+        }
+        
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .activity-icon.success {
+            background: var(--success-light);
+            color: var(--success);
+        }
+        
+        .activity-icon.warning {
+            background: var(--warning-light);
+            color: var(--warning);
+        }
+        
+        .activity-icon.info {
+            background: var(--info-light);
+            color: var(--info);
+        }
+        
+        .activity-content {
+            flex: 1;
+        }
+        
+        .activity-text {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .activity-time {
+            font-size: var(--font-size-xs);
+            color: var(--text-secondary);
+        }
+        
+        .filter-bar {
+            display: flex;
+            gap: var(--spacing-sm);
+            flex-wrap: wrap;
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .filter-btn {
+            padding: 8px 16px;
+            border: 2px solid var(--gray-300);
+            background: white;
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        
+        .filter-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .filter-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
         }
     </style>
 </head>
 <body>
-    <!-- ==================== SECTION 12: BODY & LAYOUT STRUCTURE ==================== -->
-    <!-- Purpose: Main HTML layout, test mode notice -->
-    <!-- Dependencies: PHP variables ($stats, session variables) -->
-    <!-- CLAUDE NOTE: For future updates to this section, provide the body opening tag, -->
-    <!-- test mode notice, and main dashboard-container div structure. -->
-    <?php if (isset($_GET['admin_test'])): ?>
-    <div style="background: linear-gradient(135deg, var(--info), #60A5FA); color: white; padding: 1rem; text-align: center;">
-        <strong>🧪 Admin Test Mode:</strong> Dashboard running with sample data. 
-        <a href="dashboard.php" style="color: white; text-decoration: underline;">Exit test mode</a>
-    </div>
-    <?php endif; ?>
-
-    <div class="dashboard-container">
-        <!-- ==================== SECTION 13: SIDEBAR NAVIGATION ==================== -->
-        <!-- Purpose: Left navigation menu structure -->
-        <!-- Dependencies: $productivity PHP variable for badge counts -->
-        <!-- CLAUDE NOTE: For future updates to this section, provide the complete -->
-        <!-- <aside class="sidebar"> structure including logo, navigation menu, and logout button. -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <div class="logo-icon">
-                        <i class="fas fa-paw"></i>
-                    </div>
-                    <span>Foxhole</span>
-                </div>
-            </div>
+    <div class="dashboard-wrapper">
+        <!-- Sidebar -->
+        <?php include 'components/sidebar.php'; ?>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <?php include 'components/header.php'; ?>
             
-            <nav>
-                <ul class="nav-menu">
-                    <li class="nav-item">
-                        <div class="nav-link active" onclick="showTab('overview')">
-                            <i class="fas fa-tachometer-alt"></i>
-                            <span>Overview</span>
-                        </div>
-                    </li>
-                    <li class="nav-item">
-                        <div class="nav-link" onclick="showTab('employee-report')">
-                            <i class="fas fa-users"></i>
-                            <span>Employee Report</span>
-                        </div>
-                    </li>
-                    <li class="nav-item">
-                        <div class="nav-link" onclick="showTab('project-report')">
-                            <i class="fas fa-project-diagram"></i>
-                            <span>Project Report</span>
-                        </div>
-                    </li>
-                    <li class="nav-item">
-                        <div class="nav-link" onclick="showTab('productivity')">
-                            <i class="fas fa-chart-line"></i>
-                            <span>Productivity</span>
-                            <?php if (count($productivity['bottom_performers']) > 0): ?>
-                            <span class="nav-badge"><?= count($productivity['bottom_performers']) ?></span>
-                            <?php endif; ?>
-                        </div>
-                    </li>
-                    <li class="nav-item">
-                        <div class="nav-link" onclick="showTab('ceo-notes')">
-                            <i class="fas fa-brain"></i>
-                            <span>CEO Brain Dump</span>
-                        </div>
-                    </li>
-                    <li class="nav-item">
-                        <a href="employee_dashboard.php?test_employee=1" class="nav-link">
-                            <i class="fas fa-user"></i>
-                            <span>Employee View</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-            
-            <div style="padding: 2rem; margin-top: auto;">
-                <button class="btn btn-secondary" style="width: 100%;" onclick="logout()">
-                    <i class="fas fa-sign-out-alt"></i>
-                    Logout
-                </button>
-            </div>
-        </aside>
-
-        <!-- ==================== SECTION 14: TOP BAR ==================== -->
-        <!-- Purpose: Header with title and action buttons -->
-        <!-- Dependencies: None -->
-        <!-- CLAUDE NOTE: For future updates to this section, provide the complete -->
-        <!-- <main class="main-content"> opening and <header class="top-bar"> structure. -->
-        <main class="main-content">
-            <header class="top-bar">
+            <!-- Page Content -->
+            <div class="page-content">
+                <!-- Page Header -->
                 <div class="page-header">
-                    <h1>Enhanced Admin Dashboard</h1>
-                    <p>Comprehensive team productivity and project insights</p>
+                    <h1 class="page-title">Agency Dashboard</h1>
+                    <p class="page-subtitle">Complete overview of your team, projects, and performance</p>
+                    <div class="page-header-actions">
+                        <button class="btn btn-outline" onclick="refreshDashboard()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                        <button class="btn btn-primary" onclick="exportReport()">
+                            <i class="fas fa-download"></i> Export Report
+                        </button>
+                    </div>
                 </div>
-                <div class="top-actions">
-                    <button class="btn btn-secondary" onclick="refreshDashboard()">
-                        <i class="fas fa-sync-alt"></i>
-                        Refresh
+                
+                <!-- Dashboard Tabs -->
+                <div class="dashboard-tabs">
+                    <button class="tab-btn active" data-tab="overview">
+                        <i class="fas fa-tachometer-alt"></i> Overview
                     </button>
-                    <button class="btn btn-primary" onclick="exportReport()">
-                        <i class="fas fa-download"></i>
-                        Export Report
+                    <button class="tab-btn" data-tab="projects">
+                        <i class="fas fa-project-diagram"></i> Projects
+                    </button>
+                    <button class="tab-btn" data-tab="team">
+                        <i class="fas fa-users"></i> Team
+                    </button>
+                    <button class="tab-btn" data-tab="productivity">
+                        <i class="fas fa-chart-line"></i> Productivity
+                    </button>
+                    <button class="tab-btn" data-tab="time-tracking">
+                        <i class="fas fa-clock"></i> Time Tracking
+                    </button>
+                    <button class="tab-btn" data-tab="deadlines">
+                        <i class="fas fa-calendar-alt"></i> Deadlines
+                    </button>
+                    <button class="tab-btn" data-tab="capacity">
+                        <i class="fas fa-battery-three-quarters"></i> Team Capacity
                     </button>
                 </div>
-            </header>
-
-            <!-- ==================== SECTION 15: OVERVIEW TAB CONTENT ==================== -->
-            <!-- Purpose: Main dashboard metrics and activity feed -->
-            <!-- Dependencies: $stats, $recentActivity PHP variables -->
-            <!-- CLAUDE NOTE: For future updates to this section, provide the complete -->
-            <!-- overview tab div including metrics grid and recent activity section. -->
-            <div class="content-area">
-                <div id="overview" class="tab-content active">
+                
+                <!-- Tab: Overview -->
+                <div class="tab-content active" id="tab-overview">
                     <!-- Key Metrics -->
-                    <div class="metrics-grid">
-                        <div class="metric-card">
+                    <div class="stats-grid">
+                        <div class="metric-card" style="--metric-color: var(--primary);">
                             <div class="metric-header">
+                                <span class="metric-label">Active Employees</span>
                                 <div class="metric-icon">
                                     <i class="fas fa-users"></i>
                                 </div>
                             </div>
-                            <div class="metric-number"><?= $stats['active_employees'] ?></div>
-                            <div class="metric-label">Active Today</div>
+                            <div class="metric-value"><?= $dashboardStats['employees']['active'] ?></div>
                             <div class="metric-change positive">
-                                <i class="fas fa-arrow-up"></i>
-                                <?= $stats['active_employees'] ?> of <?= $stats['total_employees'] ?> online
+                                <i class="fas fa-arrow-up"></i> of <?= $dashboardStats['employees']['total'] ?> total
                             </div>
                         </div>
                         
-                        <div class="metric-card">
+                        <div class="metric-card" style="--metric-color: var(--success);">
                             <div class="metric-header">
+                                <span class="metric-label">Active Projects</span>
                                 <div class="metric-icon">
-                                    <i class="fas fa-check-circle"></i>
+                                    <i class="fas fa-project-diagram"></i>
                                 </div>
                             </div>
-                            <div class="metric-number"><?= $stats['completed_tasks'] ?></div>
-                            <div class="metric-label">Completed Tasks</div>
+                            <div class="metric-value"><?= $dashboardStats['projects']['active'] ?></div>
                             <div class="metric-change positive">
-                                <i class="fas fa-arrow-up"></i>
-                                Productivity: <?= $stats['avg_productivity'] ?>%
+                                <i class="fas fa-arrow-up"></i> <?= $dashboardStats['projects']['completed'] ?> completed
                             </div>
                         </div>
                         
-                        <div class="metric-card">
+                        <div class="metric-card" style="--metric-color: var(--warning);">
                             <div class="metric-header">
+                                <span class="metric-label">Tasks In Progress</span>
+                                <div class="metric-icon">
+                                    <i class="fas fa-tasks"></i>
+                                </div>
+                            </div>
+                            <div class="metric-value"><?= $dashboardStats['tasks']['in_progress'] ?></div>
+                            <div class="metric-change <?= $dashboardStats['tasks']['overdue'] > 0 ? 'negative' : 'positive' ?>">
+                                <i class="fas fa-exclamation-triangle"></i> <?= $dashboardStats['tasks']['overdue'] ?> overdue
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card" style="--metric-color: var(--info);">
+                            <div class="metric-header">
+                                <span class="metric-label">Hours This Week</span>
                                 <div class="metric-icon">
                                     <i class="fas fa-clock"></i>
                                 </div>
                             </div>
-                            <div class="metric-number"><?= $stats['total_hours_logged'] ?>h</div>
-                            <div class="metric-label">Total Hours</div>
+                            <div class="metric-value"><?= number_format($dashboardStats['time']['this_week']) ?></div>
                             <div class="metric-change positive">
-                                <i class="fas fa-chart-line"></i>
-                                This week
+                                <i class="fas fa-arrow-up"></i> <?= number_format($dashboardStats['time']['this_month']) ?>h this month
                             </div>
                         </div>
                         
-                        <div class="metric-card">
+                        <div class="metric-card" style="--metric-color: var(--success);">
                             <div class="metric-header">
+                                <span class="metric-label">Avg Efficiency</span>
                                 <div class="metric-icon">
-                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <i class="fas fa-chart-line"></i>
                                 </div>
                             </div>
-                            <div class="metric-number"><?= $stats['urgent_tasks'] + $stats['overdue_tasks'] ?></div>
-                            <div class="metric-label">Priority Items</div>
-                            <div class="metric-change <?= ($stats['urgent_tasks'] + $stats['overdue_tasks']) > 0 ? 'negative' : 'positive' ?>">
-                                <i class="fas fa-exclamation"></i>
-                                <?= $stats['urgent_tasks'] ?> urgent, <?= $stats['overdue_tasks'] ?> overdue
+                            <div class="metric-value"><?= $dashboardStats['performance']['avg_efficiency'] ?>%</div>
+                            <div class="metric-change positive">
+                                <i class="fas fa-arrow-up"></i> Above target
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Recent Activity -->
-                    <div class="section-card">
-                        <div class="section-header">
-                            <h2 class="section-title">
-                                <i class="fas fa-clock"></i>
-                                Recent Activity
-                            </h2>
                         </div>
                         
-                        <div class="activity-feed">
-                            <?php foreach ($recentActivity as $activity): ?>
-                            <div class="activity-item">
-                                <div class="activity-icon"></div>
-                                <div class="activity-text"><?= htmlspecialchars($activity['activity']) ?></div>
-                                <div class="activity-time"><?= $activity['time_formatted'] ?></div>
+                        <div class="metric-card" style="--metric-color: var(--primary);">
+                            <div class="metric-header">
+                                <span class="metric-label">On-Time Delivery</span>
+                                <div class="metric-icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
                             </div>
-                            <?php endforeach; ?>
+                            <div class="metric-value"><?= $dashboardStats['performance']['projects_on_time'] ?>%</div>
+                            <div class="metric-change positive">
+                                <i class="fas fa-arrow-up"></i> Projects on schedule
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- ==================== SECTION 16: EMPLOYEE REPORT TAB ==================== -->
-                <!-- Purpose: Detailed employee performance table -->
-                <!-- Dependencies: $employeeReport PHP variable -->
-                <!-- CLAUDE NOTE: For future updates to this section, provide the complete -->
-                <!-- employee-report tab div including the performance table and all employee data display. -->
-                <div id="employee-report" class="tab-content">
-                    <div class="section-card">
-                        <div class="section-header">
-                            <h2 class="section-title">
-                                <i class="fas fa-users"></i>
-                                Detailed Employee Performance Report
-                            </h2>
-                            <button class="btn btn-secondary" onclick="exportEmployeeReport()">
-                                <i class="fas fa-download"></i>
-                                Export CSV
-                            </button>
+                    
+                    <!-- Quick Actions -->
+                    <h3 style="margin-bottom: var(--spacing-lg);">Quick Actions</h3>
+                    <div class="quick-action-grid">
+                        <div class="quick-action-card" onclick="showAddProjectModal()">
+                            <div class="quick-action-icon">
+                                <i class="fas fa-plus"></i>
+                            </div>
+                            <div class="quick-action-title">New Project</div>
+                            <div class="quick-action-desc">Start a new client project</div>
                         </div>
                         
-                        <table class="report-table">
-                            <thead>
-                                <tr>
-                                    <th>Employee</th>
-                                    <th>Status</th>
-                                    <th>Tasks</th>
-                                    <th>Hours</th>
-                                    <th>Efficiency</th>
-                                    <th>Workload</th>
-                                    <th>Current Projects</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($employeeReport as $emp): ?>
-                                <tr>
-                                    <td>
-                                        <div style="display: flex; align-items: center;">
-                                            <div class="employee-avatar-mini">
-                                                <?= substr($emp['name'], 0, 2) ?>
-                                            </div>
-                                            <div>
-                                                <strong><?= htmlspecialchars($emp['name']) ?></strong>
-                                                <br>
-                                                <small style="color: var(--gray-600);"><?= htmlspecialchars($emp['role']) ?></small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="status-badge status-<?= $emp['status'] ?>">
-                                            <?= ucfirst($emp['status']) ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <strong><?= $emp['completed_tasks'] ?></strong> / <?= $emp['total_tasks'] ?>
-                                        <?php if ($emp['overdue_tasks'] > 0): ?>
-                                        <br><small style="color: var(--danger);"><?= $emp['overdue_tasks'] ?> overdue</small>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <strong><?= $emp['total_hours'] ?>h</strong>
-                                        <br><small style="color: var(--gray-600);"><?= $emp['avg_hours_per_task'] ?>h avg</small>
-                                    </td>
-                                    <td>
-                                        <span class="performance-score score-<?= $emp['efficiency_score'] >= 90 ? 'excellent' : ($emp['efficiency_score'] >= 75 ? 'good' : ($emp['efficiency_score'] >= 60 ? 'needs-improvement' : 'poor')) ?>">
-                                            <?= $emp['efficiency_score'] ?>%
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="status-badge workload-<?= $emp['workload_status'] ?>">
-                                            <?= ucfirst($emp['workload_status']) ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <?php if (!empty($emp['current_projects'])): ?>
-                                            <?= implode(', ', array_slice($emp['current_projects'], 0, 2)) ?>
-                                            <?php if (count($emp['current_projects']) > 2): ?>
-                                                <small style="color: var(--gray-600);">+<?= count($emp['current_projects']) - 2 ?> more</small>
-                                            <?php endif; ?>
-                                        <?php else: ?>
-                                            <small style="color: var(--gray-500);">No active projects</small>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- ==================== SECTION 17: PROJECT REPORT TAB ==================== -->
-                <!-- Purpose: Project status cards and progress -->
-                <!-- Dependencies: $projectReport PHP variable -->
-                <!-- CLAUDE NOTE: For future updates to this section, provide the complete -->
-                <!-- project-report tab div including the projects grid and all project cards. -->
-                <div id="project-report" class="tab-content">
-                    <div class="section-card">
-                        <div class="section-header">
-                            <h2 class="section-title">
-                                <i class="fas fa-project-diagram"></i>
-                                Project Performance Report
-                            </h2>
-                            <button class="btn btn-secondary" onclick="exportProjectReport()">
-                                <i class="fas fa-download"></i>
-                                Export CSV
-                            </button>
+                        <div class="quick-action-card" onclick="showAddEmployeeModal()">
+                            <div class="quick-action-icon" style="background: linear-gradient(135deg, var(--success), #34D399);">
+                                <i class="fas fa-user-plus"></i>
+                            </div>
+                            <div class="quick-action-title">Add Team Member</div>
+                            <div class="quick-action-desc">Onboard new employee</div>
                         </div>
                         
-                        <div class="projects-grid">
-                            <?php foreach ($projectReport as $project): ?>
-                            <div class="project-card priority-<?= $project['priority'] ?>">
-                                <div class="project-header">
-                                    <div>
-                                        <div class="project-name"><?= htmlspecialchars($project['name']) ?></div>
-                                        <div class="project-client">
-                                            <i class="fas fa-building"></i>
-                                            <?= htmlspecialchars($project['client']) ?>
-                                        </div>
-                                    </div>
-                                    <span class="priority-badge priority-<?= $project['priority'] ?>">
-                                        <?= ucfirst($project['priority']) ?>
-                                    </span>
-                                </div>
-                                
-                                <div class="progress-section">
-                                    <div class="progress-header">
-                                        <span class="progress-text"><?= $project['progress'] ?>% Complete</span>
-                                        <span style="font-size: 14px; color: var(--gray-600);">
-                                            <?= $project['completed_tasks'] ?>/<?= $project['total_tasks'] ?> tasks
-                                        </span>
-                                    </div>
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: <?= $project['progress'] ?>%;"></div>
-                                    </div>
-                                </div>
-                                
-                                <div class="project-metrics">
-                                    <div class="project-metric">
-                                        <div class="project-metric-value"><?= $project['team_size'] ?></div>
-                                        <div class="project-metric-label">Team Size</div>
-                                    </div>
-                                    <div class="project-metric">
-                                        <div class="project-metric-value"><?= $project['total_hours'] ?>h</div>
-                                        <div class="project-metric-label">Hours Spent</div>
-                                    </div>
-                                    <div class="project-metric">
-                                        <div class="project-metric-value"><?= $project['efficiency'] ?>%</div>
-                                        <div class="project-metric-label">Efficiency</div>
-                                    </div>
-                                </div>
-                                
-                                <div style="margin-top: 1rem;">
-                                    <div style="font-size: 12px; color: var(--gray-600); margin-bottom: 8px;">
-                                        <strong>Team:</strong> 
-                                        <?= implode(', ', array_slice($project['team_members'], 0, 3)) ?>
-                                        <?php if (count($project['team_members']) > 3): ?>
-                                            +<?= count($project['team_members']) - 3 ?> more
-                                        <?php endif; ?>
-                                    </div>
-                                    <div style="font-size: 12px; color: var(--gray-600);">
-                                        <strong>Days Remaining:</strong> <?= $project['days_remaining'] ?> days
-                                    </div>
-                                </div>
+                        <div class="quick-action-card" onclick="showTaskAssignmentModal()">
+                            <div class="quick-action-icon" style="background: linear-gradient(135deg, var(--warning), #FFA726);">
+                                <i class="fas fa-clipboard-check"></i>
                             </div>
-                            <?php endforeach; ?>
+                            <div class="quick-action-title">Assign Task</div>
+                            <div class="quick-action-desc">Create and assign new task</div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- ==================== SECTION 18: PRODUCTIVITY TAB ==================== -->
-                <!-- Purpose: Performance analytics and charts -->
-                <!-- Dependencies: $productivity PHP variable -->
-                <!-- CLAUDE NOTE: For future updates to this section, provide the complete -->
-                <!-- productivity tab div including top/bottom performers and team velocity chart. -->
-                <div id="productivity" class="tab-content">
-                    <div class="performance-grid">
-                        <!-- Top Performers -->
-                        <div class="section-card">
-                            <div class="section-header">
-                                <h2 class="section-title">
-                                    <i class="fas fa-trophy"></i>
-                                    Top Performers
-                                </h2>
-                            </div>
-                            
-                            <div class="performer-list">
-                                <?php foreach ($productivity['top_performers'] as $index => $performer): ?>
-                                <div class="performer-item top-performer">
-                                    <div class="performer-rank">
-                                        <?php if ($index === 0): ?>
-                                        <i class="fas fa-crown" style="color: #FFD700;"></i>
-                                        <?php else: ?>
-                                        <span style="font-weight: 800;"><?= $index + 1 ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="performer-avatar">
-                                        <?= substr($performer['name'], 0, 2) ?>
-                                    </div>
-                                    <div class="performer-info">
-                                        <div class="performer-name"><?= htmlspecialchars($performer['name']) ?></div>
-                                        <div class="performer-stats">
-                                            <div class="performer-stat">
-                                                <span class="stat-value"><?= $performer['efficiency'] ?>%</span>
-                                                <span class="stat-label">Efficiency</span>
-                                            </div>
-                                            <div class="performer-stat">
-                                                <span class="stat-value"><?= $performer['completed_tasks'] ?></span>
-                                                <span class="stat-label">Tasks</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-
-                        <!-- Bottom Performers -->
-                        <div class="section-card">
-                            <div class="section-header">
-                                <h2 class="section-title">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                    Needs Attention
-                                </h2>
-                            </div>
-                            
-                            <div class="performer-list">
-                                <?php if (empty($productivity['bottom_performers'])): ?>
-                                <div style="text-align: center; padding: 2rem; color: var(--gray-500);">
-                                    <i class="fas fa-smile" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                                    <p>Great job! All team members are performing well.</p>
-                                </div>
-                                <?php else: ?>
-                                <?php foreach ($productivity['bottom_performers'] as $index => $performer): ?>
-                                <div class="performer-item bottom-performer">
-                                    <div class="performer-avatar">
-                                        <?= substr($performer['name'], 0, 2) ?>
-                                    </div>
-                                    <div class="performer-info">
-                                        <div class="performer-name"><?= htmlspecialchars($performer['name']) ?></div>
-                                        <div class="performer-stats">
-                                            <div class="performer-stat">
-                                                <span class="stat-value"><?= $performer['efficiency'] ?>%</span>
-                                                <span class="stat-label">Efficiency</span>
-                                            </div>
-                                            <div class="performer-stat">
-                                                <span class="stat-value"><?= $performer['completed_tasks'] ?></span>
-                                                <span class="stat-label">Tasks</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <?php endforeach; ?>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Team Velocity Chart -->
-                    <div class="section-card">
-                        <div class="section-header">
-                            <h2 class="section-title">
+                        
+                        <div class="quick-action-card" onclick="window.location.href='analytics.php'">
+                            <div class="quick-action-icon" style="background: linear-gradient(135deg, var(--info), #29B6F6);">
                                 <i class="fas fa-chart-bar"></i>
-                                Team Velocity Trend
-                            </h2>
+                            </div>
+                            <div class="quick-action-title">View Analytics</div>
+                            <div class="quick-action-desc">Detailed reports & insights</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Activity -->
+                    <div class="row" style="margin-top: var(--spacing-2xl);">
+                        <div class="col-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Recent Activity</h3>
+                                    <a href="#" class="text-primary">View All</a>
+                                </div>
+                                <div class="card-body" style="padding: 0;">
+                                    <ul class="activity-feed">
+                                        <?php if (!empty($recentActivity)): ?>
+                                            <?php foreach (array_slice($recentActivity, 0, 10) as $activity): 
+                                                $iconClass = 'info';
+                                                $icon = 'fa-info-circle';
+                                                
+                                                if (strpos(strtolower($activity['type'] ?? ''), 'complete') !== false) {
+                                                    $iconClass = 'success';
+                                                    $icon = 'fa-check-circle';
+                                                } elseif (strpos(strtolower($activity['type'] ?? ''), 'warning') !== false || 
+                                                          strpos(strtolower($activity['type'] ?? ''), 'overdue') !== false) {
+                                                    $iconClass = 'warning';
+                                                    $icon = 'fa-exclamation-triangle';
+                                                }
+                                            ?>
+                                                <li class="activity-item">
+                                                    <div class="activity-icon <?= $iconClass ?>">
+                                                        <i class="fas <?= $icon ?>"></i>
+                                                    </div>
+                                                    <div class="activity-content">
+                                                        <div class="activity-text">
+                                                            <?php if (!empty($activity['employee_name'])): ?>
+                                                                <strong><?= htmlspecialchars($activity['employee_name']) ?></strong> -
+                                                            <?php endif; ?>
+                                                            <?= htmlspecialchars($activity['activity'] ?? 'Activity') ?>
+                                                        </div>
+                                                        <div class="activity-time">
+                                                            <?php
+                                                            $time = strtotime($activity['created_at'] ?? 'now');
+                                                            $diff = time() - $time;
+                                                            if ($diff < 60) echo 'Just now';
+                                                            elseif ($diff < 3600) echo floor($diff / 60) . ' minutes ago';
+                                                            elseif ($diff < 86400) echo floor($diff / 3600) . ' hours ago';
+                                                            else echo floor($diff / 86400) . ' days ago';
+                                                            ?>
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <li class="activity-item">
+                                                <div class="activity-content" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                                                    No recent activity to display
+                                                </div>
+                                            </li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div style="display: flex; justify-content: space-between; align-items: flex-end; height: 200px; padding: 1rem 0; border-bottom: 2px solid var(--gray-200);">
-                            <?php foreach ($productivity['team_velocity'] as $week): ?>
-                            <div style="display: flex; flex-direction: column; align-items: center; flex: 1;">
-                                <div style="font-size: 12px; font-weight: 600; color: var(--gray-600); margin-bottom: 1rem;">
-                                    <?= $week['week'] ?>
+                        <div class="col-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Team Status</h3>
                                 </div>
-                                <div style="display: flex; gap: 4px; align-items: flex-end; height: 150px;">
-                                    <div style="width: 20px; background: var(--gray-300); border-radius: 4px 4px 0 0; height: <?= ($week['planned'] / 25) * 100 ?>%; position: relative; display: flex; align-items: flex-end; justify-content: center; min-height: 20px;">
-                                        <span style="position: absolute; top: -20px; font-size: 10px; font-weight: 700; color: var(--gray-700);"><?= $week['planned'] ?></span>
+                                <div class="card-body">
+                                    <div style="margin-bottom: var(--spacing-lg);">
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                            <span style="font-weight: 500; color: var(--text-secondary);">
+                                                <i class="fas fa-circle text-success" style="font-size: 8px;"></i> Active
+                                            </span>
+                                            <span style="font-weight: 700;"><?= $dashboardStats['employees']['active'] ?></span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                            <span style="font-weight: 500; color: var(--text-secondary);">
+                                                <i class="fas fa-circle text-warning" style="font-size: 8px;"></i> Busy
+                                            </span>
+                                            <span style="font-weight: 700;"><?= $dashboardStats['employees']['busy'] ?></span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                            <span style="font-weight: 500; color: var(--text-secondary);">
+                                                <i class="fas fa-circle text-danger" style="font-size: 8px;"></i> Away
+                                            </span>
+                                            <span style="font-weight: 700;"><?= $dashboardStats['employees']['away'] ?></span>
+                                        </div>
                                     </div>
-                                    <div style="width: 20px; background: var(--success); border-radius: 4px 4px 0 0; height: <?= ($week['completed'] / 25) * 100 ?>%; position: relative; display: flex; align-items: flex-end; justify-content: center; min-height: 20px;">
-                                        <span style="position: absolute; top: -20px; font-size: 10px; font-weight: 700; color: var(--gray-700);"><?= $week['completed'] ?></span>
+                                    
+                                    <div style="border-top: 1px solid var(--gray-200); padding-top: var(--spacing-lg);">
+                                        <h4 style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-md); color: var(--text-secondary);">
+                                            Project Status
+                                        </h4>
+                                        <div style="margin-bottom: var(--spacing-md);">
+                                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                                <span style="font-weight: 500; color: var(--text-secondary);">Completion Rate</span>
+                                                <span style="font-weight: 700; color: var(--success);">
+                                                    <?php 
+                                                    $total = $dashboardStats['tasks']['total'];
+                                                    $completed = $dashboardStats['tasks']['completed'];
+                                                    echo $total > 0 ? round(($completed / $total) * 100) : 0;
+                                                    ?>%
+                                                </span>
+                                            </div>
+                                            <div style="height: 8px; background: var(--gray-200); border-radius: 4px; overflow: hidden;">
+                                                <div style="width: <?= $total > 0 ? round(($completed / $total) * 100) : 0 ?>%; height: 100%; background: var(--success);"></div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <div style="display: flex; justify-content: center; gap: 2rem; margin-top: 1rem;">
-                            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--gray-600);">
-                                <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--gray-300);"></div>
-                                <span>Planned</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--gray-600);">
-                                <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--success);"></div>
-                                <span>Completed</span>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- ==================== SECTION 19: CEO NOTES TAB CONTENT ==================== -->
-                <!-- Purpose: CEO Quick Notes/Brain Dump functionality -->
-                <!-- Dependencies: localStorage for data persistence -->
-                <!-- CLAUDE NOTE: For future updates to this section, provide the complete -->
-                <!-- CEO notes tab including brain dump, quick tasks, big 3, and saved notes. -->
-                <div id="ceo-notes" class="tab-content">
-                    <!-- Quick Capture Section -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
-                        <!-- Brain Dump Area -->
-                        <div class="section-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                            <div class="section-header" style="border-bottom-color: rgba(255,255,255,0.3);">
-                                <h2 class="section-title" style="color: white;">
-                                    <i class="fas fa-brain"></i>
-                                    Quick Brain Dump
-                                </h2>
-                                <button class="btn" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);" onclick="clearBrainDump()">
-                                    <i class="fas fa-trash"></i>
-                                    Clear
-                                </button>
+                
+                <!-- Tab: Projects -->
+                <div class="tab-content" id="tab-projects">
+                    <div class="filter-bar">
+                        <button class="filter-btn active" onclick="filterProjects('all')">All Projects</button>
+                        <button class="filter-btn" onclick="filterProjects('active')">Active</button>
+                        <button class="filter-btn" onclick="filterProjects('planning')">Planning</button>
+                        <button class="filter-btn" onclick="filterProjects('completed')">Completed</button>
+                    </div>
+                    
+                    <div id="projects-list">
+                        <?php if (!empty($projectMetrics)): ?>
+                            <?php foreach ($projectMetrics as $project): 
+                                $progress = $project['total_tasks'] > 0 ? 
+                                    round(($project['completed_tasks'] / $project['total_tasks']) * 100) : 0;
+                                $efficiency = round($project['efficiency']);
+                                
+                                $priorityColor = [
+                                    'urgent' => 'var(--danger)',
+                                    'high' => 'var(--warning)',
+                                    'medium' => 'var(--info)',
+                                    'low' => 'var(--success)'
+                                ][$project['priority'] ?? 'medium'];
+                            ?>
+                                <div class="project-card" data-status="<?= htmlspecialchars($project['status']) ?>">
+                                    <div class="project-header">
+                                        <div>
+                                            <h3 class="project-title"><?= htmlspecialchars($project['name']) ?></h3>
+                                            <p class="project-client">
+                                                <i class="fas fa-briefcase"></i> <?= htmlspecialchars($project['client'] ?? 'Internal') ?>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span class="badge" style="background: <?= $priorityColor ?>; color: white;">
+                                                <?= ucfirst($project['priority'] ?? 'medium') ?> Priority
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                            <span style="font-size: var(--font-size-sm); color: var(--text-secondary);">Progress</span>
+                                            <span style="font-weight: 700; color: var(--primary);"><?= $progress ?>%</span>
+                                        </div>
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" style="width: <?= $progress ?>%;"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="project-meta">
+                                        <div class="meta-item">
+                                            <span class="meta-label">Tasks</span>
+                                            <span class="meta-value"><?= $project['completed_tasks'] ?>/<?= $project['total_tasks'] ?></span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <span class="meta-label">Hours Logged</span>
+                                            <span class="meta-value"><?= number_format($project['hours_logged']) ?>h</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <span class="meta-label">Efficiency</span>
+                                            <span class="meta-value" style="color: <?= $efficiency > 100 ? 'var(--danger)' : 'var(--success)' ?>;">
+                                                <?= $efficiency ?>%
+                                            </span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <span class="meta-label">Team Size</span>
+                                            <span class="meta-value"><?= $project['team_size'] ?> members</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <span class="meta-label">Days Left</span>
+                                            <span class="meta-value <?= $project['days_remaining'] < 7 ? 'text-danger' : '' ?>">
+                                                <?= max(0, $project['days_remaining']) ?> days
+                                            </span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <span class="meta-label">Status</span>
+                                            <span class="badge badge-<?= $project['status'] === 'active' ? 'success' : 'secondary' ?>">
+                                                <?= ucfirst($project['status']) ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-md);">
+                                        <button class="btn btn-sm btn-primary" onclick="viewProject(<?= $project['id'] ?>)">
+                                            <i class="fas fa-eye"></i> View Details
+                                        </button>
+                                        <button class="btn btn-sm btn-secondary" onclick="editProject(<?= $project['id'] ?>)">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="card">
+                                <div class="card-body" style="text-align: center; padding: 3rem;">
+                                    <i class="fas fa-project-diagram" style="font-size: 3rem; color: var(--gray-400); margin-bottom: 1rem;"></i>
+                                    <h3 style="color: var(--text-secondary);">No active projects</h3>
+                                    <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Start by creating your first project</p>
+                                    <button class="btn btn-primary" onclick="showAddProjectModal()">
+                                        <i class="fas fa-plus"></i> Create Project
+                                    </button>
+                                </div>
                             </div>
-                            
-                            <div style="margin-bottom: 1rem;">
-                                <textarea id="brain-dump-text" 
-                                          placeholder="💭 Quick thoughts, ideas, reminders... Just dump everything here! Press Ctrl+S to save."
-                                          style="width: 100%; height: 200px; padding: 1rem; border: none; border-radius: 12px; font-size: 16px; line-height: 1.6; resize: vertical; background: rgba(255,255,255,0.1); color: white; backdrop-filter: blur(10px);"
-                                          onkeydown="handleQuickSave(event)"></textarea>
-                            </div>
-                            
-                            <div style="display: flex; gap: 1rem;">
-                                <button class="btn" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); flex: 1;" onclick="saveBrainDump()">
-                                    <i class="fas fa-save"></i>
-                                    Save Notes
-                                </button>
-                                <button class="btn" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);" onclick="speakToBrainDump()">
-                                    <i class="fas fa-microphone"></i>
-                                    Voice
-                                </button>
-                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <!-- Tab: Team -->
+                <div class="tab-content" id="tab-team">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Team Members Overview</h3>
+                            <button class="btn btn-sm btn-primary" onclick="showAddEmployeeModal()">
+                                <i class="fas fa-user-plus"></i> Add Member
+                            </button>
                         </div>
-
-                        <!-- Quick Tasks -->
-                        <div class="section-card">
-                            <div class="section-header">
-                                <h2 class="section-title">
-                                    <i class="fas fa-bolt"></i>
-                                    Quick Tasks & Ideas
-                                </h2>
-                            </div>
-                            
-                            <div style="margin-bottom: 1rem;">
-                                <input type="text" id="quick-task-input" 
-                                       placeholder="💡 Type a quick task or idea and press Enter..."
-                                       style="width: 100%; padding: 14px; border: 2px solid var(--gray-200); border-radius: 12px; font-size: 16px;"
-                                       onkeypress="handleQuickTaskEnter(event)">
-                            </div>
-                            
-                            <div style="display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap;">
-                                <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;" onclick="addQuickTask('🔥 Priority')">🔥 Priority</button>
-                                <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;" onclick="addQuickTask('💼 Business')">💼 Business</button>
-                                <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;" onclick="addQuickTask('💰 Finance')">💰 Finance</button>
-                                <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;" onclick="addQuickTask('👥 Team')">👥 Team</button>
-                                <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;" onclick="addQuickTask('🎯 Project')">🎯 Project</button>
-                            </div>
-                            
-                            <div id="quick-tasks-list" style="max-height: 300px; overflow-y: auto;">
-                                <!-- Quick tasks will be populated here -->
+                        <div class="card-body" style="padding: 0;">
+                            <div class="table-responsive">
+                                <table class="employee-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Role</th>
+                                            <th>Status</th>
+                                            <th>Tasks</th>
+                                            <th>Hours (Week)</th>
+                                            <th>Efficiency</th>
+                                            <th>Projects</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (!empty($productivity)): ?>
+                                            <?php foreach ($productivity as $emp): 
+                                                $initials = strtoupper(substr($emp['name'], 0, 2));
+                                                $efficiency = round($emp['efficiency_ratio']);
+                                            ?>
+                                                <tr>
+                                                    <td>
+                                                        <div style="display: flex; align-items: center;">
+                                                            <span class="employee-avatar-sm"><?= $initials ?></span>
+                                                            <div>
+                                                                <div style="font-weight: 600;"><?= htmlspecialchars($emp['name']) ?></div>
+                                                                <div style="font-size: var(--font-size-xs); color: var(--text-secondary);">
+                                                                    ID: <?= $emp['id'] ?>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td><?= htmlspecialchars($emp['role'] ?? 'Team Member') ?></td>
+                                                    <td>
+                                                        <span class="badge badge-<?= $emp['status'] === 'active' ? 'success' : ($emp['status'] === 'busy' ? 'warning' : 'secondary') ?>">
+                                                            <?= ucfirst($emp['status'] ?? 'active') ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <strong><?= $emp['completed_tasks'] ?></strong>/<?= $emp['total_tasks'] ?>
+                                                        <?php if ($emp['overdue_tasks'] > 0): ?>
+                                                            <span class="badge badge-danger" style="margin-left: 4px;"><?= $emp['overdue_tasks'] ?> overdue</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td><?= number_format($emp['week_hours']) ?>h</td>
+                                                    <td>
+                                                        <span style="color: <?= $efficiency > 100 ? 'var(--danger)' : ($efficiency > 90 ? 'var(--success)' : 'var(--warning)') ?>; font-weight: 600;">
+                                                            <?= $efficiency ?>%
+                                                        </span>
+                                                    </td>
+                                                    <td><?= $emp['projects_count'] ?></td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-secondary" onclick="viewEmployee(<?= $emp['id'] ?>)">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <tr>
+                                                <td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                                                    No team members found
+                                                </td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Today's Focus & Saved Notes -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                        <!-- Today's Focus -->
-                        <div class="section-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
-                            <div class="section-header" style="border-bottom-color: rgba(255,255,255,0.3);">
-                                <h2 class="section-title" style="color: white;">
-                                    <i class="fas fa-target"></i>
-                                    Today's Big 3
-                                </h2>
+                </div>
+                
+                <!-- Tab: Time Tracking -->
+                <div class="tab-content" id="tab-time-tracking">
+                    <div class="stats-grid">
+                        <div class="metric-card" style="--metric-color: var(--primary);">
+                            <div class="metric-header">
+                                <span class="metric-label">Total Hours (All Time)</span>
+                                <div class="metric-icon"><i class="fas fa-clock"></i></div>
                             </div>
-                            
-                            <div style="margin-bottom: 1rem; color: rgba(255,255,255,0.9); font-size: 14px;">
-                                What are the 3 most important things to focus on today?
-                            </div>
-                            
-                            <div id="big-three-list">
-                                <div class="big-three-item">
-                                    <input type="text" placeholder="1. Most important priority..." 
-                                           style="width: 100%; padding: 12px; margin-bottom: 12px; border: none; border-radius: 8px; background: rgba(255,255,255,0.2); color: white; font-size: 16px; font-weight: 600;"
-                                           onchange="saveBigThree()">
-                                </div>
-                                <div class="big-three-item">
-                                    <input type="text" placeholder="2. Second priority..." 
-                                           style="width: 100%; padding: 12px; margin-bottom: 12px; border: none; border-radius: 8px; background: rgba(255,255,255,0.2); color: white; font-size: 16px; font-weight: 600;"
-                                           onchange="saveBigThree()">
-                                </div>
-                                <div class="big-three-item">
-                                    <input type="text" placeholder="3. Third priority..." 
-                                           style="width: 100%; padding: 12px; margin-bottom: 12px; border: none; border-radius: 8px; background: rgba(255,255,255,0.2); color: white; font-size: 16px; font-weight: 600;"
-                                           onchange="saveBigThree()">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Saved Notes & Ideas -->
-                        <div class="section-card">
-                            <div class="section-header">
-                                <h2 class="section-title">
-                                    <i class="fas fa-bookmark"></i>
-                                    Saved Ideas & Notes
-                                </h2>
-                                <button class="btn btn-secondary" onclick="exportAllNotes()">
-                                    <i class="fas fa-download"></i>
-                                    Export
-                                </button>
-                            </div>
-                            
-                            <div id="saved-notes-list" style="max-height: 400px; overflow-y: auto;">
-                                <!-- Saved notes will be populated here -->
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Quick Stats for CEO -->
-                    <div class="section-card" style="margin-top: 2rem; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
-                        <div class="section-header" style="border-bottom-color: rgba(255,255,255,0.3);">
-                            <h2 class="section-title" style="color: white;">
-                                <i class="fas fa-dashboard"></i>
-                                Your Personal Dashboard
-                            </h2>
+                            <div class="metric-value"><?= number_format($dashboardStats['time']['total_hours']) ?></div>
+                            <div class="metric-change positive">Tracked hours</div>
                         </div>
                         
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                            <div style="background: rgba(255,255,255,0.2); padding: 1.5rem; border-radius: 12px; text-align: center; backdrop-filter: blur(10px);">
-                                <div style="font-size: 32px; font-weight: 800; margin-bottom: 8px;" id="ceo-notes-count">0</div>
-                                <div style="font-size: 14px; opacity: 0.9;">Total Notes</div>
+                        <div class="metric-card" style="--metric-color: var(--success);">
+                            <div class="metric-header">
+                                <span class="metric-label">This Week</span>
+                                <div class="metric-icon"><i class="fas fa-calendar-week"></i></div>
                             </div>
-                            <div style="background: rgba(255,255,255,0.2); padding: 1.5rem; border-radius: 12px; text-align: center; backdrop-filter: blur(10px);">
-                                <div style="font-size: 32px; font-weight: 800; margin-bottom: 8px;" id="ceo-tasks-count">0</div>
-                                <div style="font-size: 14px; opacity: 0.9;">Quick Tasks</div>
+                            <div class="metric-value"><?= number_format($dashboardStats['time']['this_week']) ?></div>
+                            <div class="metric-change positive">Hours logged</div>
+                        </div>
+                        
+                        <div class="metric-card" style="--metric-color: var(--info);">
+                            <div class="metric-header">
+                                <span class="metric-label">This Month</span>
+                                <div class="metric-icon"><i class="fas fa-calendar-alt"></i></div>
                             </div>
-                            <div style="background: rgba(255,255,255,0.2); padding: 1.5rem; border-radius: 12px; text-align: center; backdrop-filter: blur(10px);">
-                                <div style="font-size: 32px; font-weight: 800; margin-bottom: 8px;" id="ceo-focus-score">0</div>
-                                <div style="font-size: 14px; opacity: 0.9;">Focus Score</div>
+                            <div class="metric-value"><?= number_format($dashboardStats['time']['this_month']) ?></div>
+                            <div class="metric-change positive">Hours this month</div>
+                        </div>
+                        
+                        <div class="metric-card" style="--metric-color: var(--warning);">
+                            <div class="metric-header">
+                                <span class="metric-label">Billable Hours</span>
+                                <div class="metric-icon"><i class="fas fa-dollar-sign"></i></div>
                             </div>
-                            <div style="background: rgba(255,255,255,0.2); padding: 1.5rem; border-radius: 12px; text-align: center; backdrop-filter: blur(10px);">
-                                <div style="font-size: 32px; font-weight: 800; margin-bottom: 8px;"><?= date('M d') ?></div>
-                                <div style="font-size: 14px; opacity: 0.9;">Today</div>
+                            <div class="metric-value"><?= number_format($dashboardStats['time']['billable_hours']) ?></div>
+                            <div class="metric-change positive">Est. billable</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Time Breakdown by Employee</h3>
+                        </div>
+                        <div class="card-body">
+                            <?php if (!empty($productivity)): ?>
+                                <?php foreach ($productivity as $emp): ?>
+                                    <div style="margin-bottom: var(--spacing-lg);">
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                            <span style="font-weight: 600;"><?= htmlspecialchars($emp['name']) ?></span>
+                                            <span style="font-weight: 700; color: var(--primary);"><?= number_format($emp['total_hours']) ?>h total</span>
+                                        </div>
+                                        <div style="display: flex; gap: var(--spacing-sm); font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 8px;">
+                                            <span>This week: <?= number_format($emp['week_hours']) ?>h</span>
+                                            <span>•</span>
+                                            <span><?= $emp['completed_tasks'] ?> tasks completed</span>
+                                        </div>
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" style="width: <?= min(100, ($emp['week_hours'] / 40) * 100) ?>%;"></div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p style="text-align: center; color: var(--text-muted); padding: 2rem;">No time tracking data available</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tab: Deadlines -->
+                <div class="tab-content" id="tab-deadlines">
+                    <h3 style="margin-bottom: var(--spacing-lg);">Upcoming Deadlines (Next 7 Days)</h3>
+                    
+                    <?php if (!empty($upcomingDeadlines)): ?>
+                        <?php foreach ($upcomingDeadlines as $deadline): 
+                            $daysUntil = $deadline['days_until_due'];
+                            $deadlineColor = $daysUntil <= 1 ? 'var(--danger)' : ($daysUntil <= 3 ? 'var(--warning)' : 'var(--info)');
+                        ?>
+                            <div class="deadline-card" style="--deadline-color: <?= $deadlineColor ?>;">
+                                <div class="deadline-info">
+                                    <div class="deadline-title"><?= htmlspecialchars($deadline['title']) ?></div>
+                                    <div class="deadline-meta">
+                                        <i class="fas fa-project-diagram"></i> <?= htmlspecialchars($deadline['project_name']) ?>
+                                        <span style="margin: 0 8px;">•</span>
+                                        <i class="fas fa-user"></i> <?= htmlspecialchars($deadline['employee_name']) ?>
+                                        <span style="margin: 0 8px;">•</span>
+                                        <span class="badge badge-<?= $deadline['priority'] === 'urgent' ? 'danger' : ($deadline['priority'] === 'high' ? 'warning' : 'secondary') ?>">
+                                            <?= ucfirst($deadline['priority'] ?? 'medium') ?>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="deadline-days">
+                                    <?php if ($daysUntil == 0): ?>
+                                        <div style="font-size: var(--font-size-lg);">TODAY</div>
+                                    <?php elseif ($daysUntil == 1): ?>
+                                        <div style="font-size: var(--font-size-lg);">TOMORROW</div>
+                                    <?php else: ?>
+                                        <div style="font-size: 1.5rem;"><?= $daysUntil ?></div>
+                                        <div style="font-size: var(--font-size-xs);">days</div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="card">
+                            <div class="card-body" style="text-align: center; padding: 3rem;">
+                                <i class="fas fa-calendar-check" style="font-size: 3rem; color: var(--success); margin-bottom: 1rem;"></i>
+                                <h3 style="color: var(--text-secondary);">No upcoming deadlines</h3>
+                                <p style="color: var(--text-muted);">All tasks are on track or completed</p>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Tab: Team Capacity -->
+                <div class="tab-content" id="tab-capacity">
+                    <h3 style="margin-bottom: var(--spacing-lg);">Team Resource Allocation</h3>
+                    
+                    <?php if (!empty($teamCapacity)): ?>
+                        <div class="card">
+                            <div class="card-body" style="padding: 0;">
+                                <table class="employee-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Role</th>
+                                            <th>Active Tasks</th>
+                                            <th>Pending Hours</th>
+                                            <th>Week Hours</th>
+                                            <th>Capacity</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($teamCapacity as $member): 
+                                            $initials = strtoupper(substr($member['name'], 0, 2));
+                                            $capacityClass = 'capacity-' . ($member['capacity_status'] ?? 'normal');
+                                        ?>
+                                            <tr>
+                                                <td>
+                                                    <div style="display: flex; align-items: center;">
+                                                        <span class="employee-avatar-sm"><?= $initials ?></span>
+                                                        <?= htmlspecialchars($member['name']) ?>
+                                                    </div>
+                                                </td>
+                                                <td><?= htmlspecialchars($member['role'] ?? 'Team Member') ?></td>
+                                                <td><strong><?= $member['active_tasks'] ?></strong> tasks</td>
+                                                <td><?= number_format($member['pending_hours']) ?>h</td>
+                                                <td><?= number_format($member['week_hours']) ?>h</td>
+                                                <td>
+                                                    <span class="capacity-indicator <?= $capacityClass ?>">
+                                                        <?= ucfirst($member['capacity_status'] ?? 'normal') ?>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-primary" onclick="assignTask(<?= $member['id'] ?>)">
+                                                        <i class="fas fa-plus"></i> Assign Task
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="stats-grid" style="margin-top: var(--spacing-xl);">
+                            <div class="metric-card" style="--metric-color: var(--success);">
+                                <div class="metric-header">
+                                    <span class="metric-label">Available</span>
+                                    <div class="metric-icon"><i class="fas fa-check-circle"></i></div>
+                                </div>
+                                <div class="metric-value">
+                                    <?= count(array_filter($teamCapacity, fn($m) => ($m['capacity_status'] ?? '') === 'available')) ?>
+                                </div>
+                            </div>
+                            
+                            <div class="metric-card" style="--metric-color: var(--info);">
+                                <div class="metric-header">
+                                    <span class="metric-label">Normal Load</span>
+                                    <div class="metric-icon"><i class="fas fa-user"></i></div>
+                                </div>
+                                <div class="metric-value">
+                                    <?= count(array_filter($teamCapacity, fn($m) => ($m['capacity_status'] ?? '') === 'normal')) ?>
+                                </div>
+                            </div>
+                            
+                            <div class="metric-card" style="--metric-color: var(--warning);">
+                                <div class="metric-header">
+                                    <span class="metric-label">Busy</span>
+                                    <div class="metric-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                                </div>
+                                <div class="metric-value">
+                                    <?= count(array_filter($teamCapacity, fn($m) => ($m['capacity_status'] ?? '') === 'busy')) ?>
+                                </div>
+                            </div>
+                            
+                            <div class="metric-card" style="--metric-color: var(--danger);">
+                                <div class="metric-header">
+                                    <span class="metric-label">Overloaded</span>
+                                    <div class="metric-icon"><i class="fas fa-times-circle"></i></div>
+                                </div>
+                                <div class="metric-value">
+                                    <?= count(array_filter($teamCapacity, fn($m) => ($m['capacity_status'] ?? '') === 'overloaded')) ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="card">
+                            <div class="card-body" style="text-align: center; padding: 3rem;">
+                                <p style="color: var(--text-muted);">No team capacity data available</p>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Tab: Productivity -->
+                <div class="tab-content" id="tab-productivity">
+                    <h3 style="margin-bottom: var(--spacing-lg);">Team Productivity Analysis</h3>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Top Performers</h3>
+                                </div>
+                                <div class="card-body">
+                                    <?php 
+                                    $topPerformers = array_slice($productivity, 0, 5);
+                                    if (!empty($topPerformers)):
+                                    ?>
+                                        <?php foreach ($topPerformers as $index => $performer): ?>
+                                            <div style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-md); background: var(--gray-50); border-radius: var(--radius-md); margin-bottom: var(--spacing-sm);">
+                                                <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700;">
+                                                    #<?= $index + 1 ?>
+                                                </div>
+                                                <div style="flex: 1;">
+                                                    <div style="font-weight: 600;"><?= htmlspecialchars($performer['name']) ?></div>
+                                                    <div style="font-size: var(--font-size-xs); color: var(--text-secondary);">
+                                                        <?= $performer['completed_tasks'] ?> tasks • <?= round($performer['efficiency_ratio']) ?>% efficiency
+                                                    </div>
+                                                </div>
+                                                <div style="font-weight: 700; color: var(--success);">
+                                                    <?= number_format($performer['total_hours']) ?>h
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <p style="text-align: center; color: var(--text-muted); padding: 2rem;">No data available</p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Needs Attention</h3>
+                                </div>
+                                <div class="card-body">
+                                    <?php 
+                                    $needsAttention = array_filter($productivity, fn($p) => $p['overdue_tasks'] > 0 || $p['efficiency_ratio'] < 80);
+                                    if (!empty($needsAttention)):
+                                    ?>
+                                        <?php foreach (array_slice($needsAttention, 0, 5) as $emp): ?>
+                                            <div style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-md); background: var(--warning-light); border-radius: var(--radius-md); margin-bottom: var(--spacing-sm);">
+                                                <div style="flex: 1;">
+                                                    <div style="font-weight: 600;"><?= htmlspecialchars($emp['name']) ?></div>
+                                                    <div style="font-size: var(--font-size-xs); color: var(--text-secondary);">
+                                                        <?php if ($emp['overdue_tasks'] > 0): ?>
+                                                            <span class="badge badge-danger"><?= $emp['overdue_tasks'] ?> overdue</span>
+                                                        <?php endif; ?>
+                                                        <?php if ($emp['efficiency_ratio'] < 80): ?>
+                                                            <span class="badge badge-warning"><?= round($emp['efficiency_ratio']) ?>% efficiency</span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                                <button class="btn btn-sm btn-warning" onclick="reviewEmployee(<?= $emp['id'] ?>)">
+                                                    <i class="fas fa-eye"></i> Review
+                                                </button>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <div style="text-align: center; padding: 2rem;">
+                                            <i class="fas fa-check-circle" style="font-size: 3rem; color: var(--success); margin-bottom: 1rem;"></i>
+                                            <p style="color: var(--text-secondary); font-weight: 600;">All team members performing well!</p>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </main>
+        </div>
     </div>
-
-    <!-- ==================== SECTION 20: CORE JAVASCRIPT FUNCTIONS ==================== -->
-    <!-- Purpose: Tab management, data refresh, UI interactions -->
-    <!-- Dependencies: None -->
-    <!-- CLAUDE NOTE: For future updates to this section, provide the core JavaScript -->
-    <!-- functions including showTab(), refreshDashboard(), and primary interaction handlers. -->
+    
     <script>
-        // Tab management - FIXED
-        function showTab(tabId) {
-            console.log('Switching to tab:', tabId);
-            
-            // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
+        // Tab Management
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.getElementById('tab-' + tabId).classList.add('active');
+                sessionStorage.setItem('activeTab', tabId);
             });
-            
-            // Remove active class from all nav links
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.classList.remove('active');
-            });
-            
-            // Show selected tab content
-            const selectedTab = document.getElementById(tabId);
-            if (selectedTab) {
-                selectedTab.classList.add('active');
-                console.log('Tab activated:', tabId);
-            } else {
-                console.error('Tab not found:', tabId);
+        });
+        
+        // Restore active tab
+        window.addEventListener('load', () => {
+            const activeTab = sessionStorage.getItem('activeTab');
+            if (activeTab) {
+                const tabBtn = document.querySelector('[data-tab="' + activeTab + '"]');
+                if (tabBtn) tabBtn.click();
             }
-            
-            // Find and activate the corresponding nav link
-            document.querySelectorAll('.nav-link').forEach(link => {
-                const onclick = link.getAttribute('onclick');
-                if (onclick && onclick.includes(`'${tabId}'`)) {
-                    link.classList.add('active');
-                    console.log('Nav link activated for:', tabId);
-                }
-            });
-
-            // Initialize CEO notes if switching to that tab
-            if (tabId === 'ceo-notes') {
-                setTimeout(initializeCEONotes, 100);
-            }
-        }
-
-        // Refresh dashboard
-        async function refreshDashboard() {
-            try {
-                const response = await fetch('dashboard.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: 'action=refresh_data'
-                });
-                
-                const result = await response.json();
-                if (result.success) {
-                    location.reload();
+        });
+        
+        // Dashboard Functions
+        function refreshDashboard() { location.reload(); }
+        function exportReport() { alert('Export feature coming soon!'); }
+        function showAddProjectModal() { alert('Add Project modal coming soon!'); }
+        function viewProject(id) { window.location.href = 'project_details.php?id=' + id; }
+        function editProject(id) { alert('Edit Project ' + id); }
+        function showAddEmployeeModal() { alert('Add Employee modal coming soon!'); }
+        function viewEmployee(id) { window.location.href = 'employee_details.php?id=' + id; }
+        function editEmployee(id) { alert('Edit Employee ' + id); }
+        function reviewEmployee(id) { alert('Review Employee ' + id); }
+        function showTaskAssignmentModal() { alert('Task Assignment modal coming soon!'); }
+        function assignTask(employeeId) { alert('Assign task to employee ' + employeeId); }
+        
+        function filterProjects(status) {
+            const projects = document.querySelectorAll('.project-card');
+            const buttons = document.querySelectorAll('#tab-projects .filter-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            projects.forEach(project => {
+                if (status === 'all' || project.dataset.status === status) {
+                    project.style.display = 'block';
                 } else {
-                    console.error('Failed to refresh data');
-                }
-            } catch (error) {
-                console.error('Refresh error:', error);
-                location.reload();
-            }
-        }
-
-        /* ==================== SECTION 21: UTILITY FUNCTIONS ==================== */
-        /* Purpose: Export, logout, keyboard shortcuts */
-        /* Dependencies: Core functions */
-        /* CLAUDE NOTE: For future updates to this section, provide all utility */
-        /* functions including export functions, logout, and helper functions. */
-
-        // Export functions
-        function exportReport() {
-            alert('📊 Generating comprehensive productivity report...\n\nThis will include:\n• Team performance metrics\n• Individual productivity scores\n• Project completion rates\n• Capacity utilization\n• Trend analysis');
-        }
-
-        function exportEmployeeReport() {
-            alert('📊 Exporting employee performance report as CSV...\n\nThis will include:\n• Individual performance metrics\n• Task completion rates\n• Time tracking data\n• Efficiency scores\n• Current workload status');
-        }
-
-        function exportProjectReport() {
-            alert('📊 Exporting project report as CSV...\n\nThis will include:\n• Project progress and status\n• Team allocation\n• Time and budget tracking\n• Efficiency metrics\n• Timeline analysis');
-        }
-
-        // Logout
-        function logout() {
-            if (confirm('Are you sure you want to logout?')) {
-                window.location.href = 'auth.php?action=logout';
-            }
-        }
-
-        /* ==================== SECTION 22: CEO NOTES JAVASCRIPT ==================== */
-        /* Purpose: All CEO notes functionality */
-        /* Dependencies: localStorage */
-        /* CLAUDE NOTE: For future updates to this section, provide all CEO notes */
-        /* JavaScript including localStorage management, UI updates, and interactions. */
-
-        // CEO NOTES JAVASCRIPT
-        let quickTasks = JSON.parse(localStorage.getItem('ceo_quick_tasks') || '[]');
-        let savedNotes = JSON.parse(localStorage.getItem('ceo_saved_notes') || '[]');
-        let bigThree = JSON.parse(localStorage.getItem('ceo_big_three') || '["","",""]');
-
-        function handleQuickSave(event) {
-            if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-                event.preventDefault();
-                saveBrainDump();
-            }
-        }
-
-        function saveBrainDump() {
-            const text = document.getElementById('brain-dump-text').value.trim();
-            if (text) {
-                const note = {
-                    id: Date.now(),
-                    content: text,
-                    timestamp: new Date().toLocaleString(),
-                    type: 'brain_dump'
-                };
-                
-                savedNotes.unshift(note);
-                localStorage.setItem('ceo_saved_notes', JSON.stringify(savedNotes));
-                
-                // Clear the brain dump
-                document.getElementById('brain-dump-text').value = '';
-                
-                updateNotesDisplay();
-                updateCEOStats();
-                
-                // Show quick feedback
-                showQuickFeedback('Brain dump saved! 🧠');
-            }
-        }
-
-        function clearBrainDump() {
-            if (confirm('Clear brain dump area?')) {
-                document.getElementById('brain-dump-text').value = '';
-            }
-        }
-
-        function handleQuickTaskEnter(event) {
-            if (event.key === 'Enter') {
-                const text = event.target.value.trim();
-                if (text) {
-                    addQuickTask(text);
-                    event.target.value = '';
-                }
-            }
-        }
-
-        function addQuickTask(text, category = '') {
-            const task = {
-                id: Date.now(),
-                text: text,
-                category: category,
-                completed: false,
-                timestamp: new Date().toLocaleString()
-            };
-            
-            quickTasks.unshift(task);
-            localStorage.setItem('ceo_quick_tasks', JSON.stringify(quickTasks));
-            
-            updateTasksDisplay();
-            updateCEOStats();
-            
-            showQuickFeedback('Task added! ⚡');
-        }
-
-        function toggleTask(taskId) {
-            const task = quickTasks.find(t => t.id === taskId);
-            if (task) {
-                task.completed = !task.completed;
-                localStorage.setItem('ceo_quick_tasks', JSON.stringify(quickTasks));
-                updateTasksDisplay();
-                updateCEOStats();
-            }
-        }
-
-        function deleteTask(taskId) {
-            quickTasks = quickTasks.filter(t => t.id !== taskId);
-            localStorage.setItem('ceo_quick_tasks', JSON.stringify(quickTasks));
-            updateTasksDisplay();
-            updateCEOStats();
-        }
-
-        function saveBigThree() {
-            const inputs = document.querySelectorAll('#big-three-list input');
-            bigThree = Array.from(inputs).map(input => input.value);
-            localStorage.setItem('ceo_big_three', JSON.stringify(bigThree));
-            updateCEOStats();
-        }
-
-        function updateTasksDisplay() {
-            const container = document.getElementById('quick-tasks-list');
-            if (!container) return;
-            
-            if (quickTasks.length === 0) {
-                container.innerHTML = '<div style="text-align: center; color: var(--gray-500); padding: 2rem;">No quick tasks yet. Add one above! 🚀</div>';
-                return;
-            }
-            
-            container.innerHTML = quickTasks.map(task => `
-                <div class="quick-task-item ${task.completed ? 'completed' : ''}" onclick="toggleTask(${task.id})">
-                    <div class="quick-task-text">${task.text}</div>
-                    <div class="quick-task-meta">
-                        <span>${task.timestamp}</span>
-                        <button class="delete-btn" onclick="event.stopPropagation(); deleteTask(${task.id})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function updateNotesDisplay() {
-            const container = document.getElementById('saved-notes-list');
-            if (!container) return;
-            
-            if (savedNotes.length === 0) {
-                container.innerHTML = '<div style="text-align: center; color: var(--gray-500); padding: 2rem;">No saved notes yet. Use the brain dump area! 🧠</div>';
-                return;
-            }
-            
-            container.innerHTML = savedNotes.slice(0, 10).map(note => `
-                <div class="saved-note-item">
-                    <div class="saved-note-header">
-                        <div class="saved-note-time">${note.timestamp}</div>
-                        <button class="delete-btn" onclick="deleteNote(${note.id})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                    <div class="saved-note-content">${note.content.substring(0, 200)}${note.content.length > 200 ? '...' : ''}</div>
-                </div>
-            `).join('');
-        }
-
-        function deleteNote(noteId) {
-            if (confirm('Delete this note?')) {
-                savedNotes = savedNotes.filter(n => n.id !== noteId);
-                localStorage.setItem('ceo_saved_notes', JSON.stringify(savedNotes));
-                updateNotesDisplay();
-                updateCEOStats();
-            }
-        }
-
-        function updateCEOStats() {
-            const notesCountEl = document.getElementById('ceo-notes-count');
-            const tasksCountEl = document.getElementById('ceo-tasks-count');
-            const focusScoreEl = document.getElementById('ceo-focus-score');
-            
-            if (notesCountEl) notesCountEl.textContent = savedNotes.length;
-            if (tasksCountEl) tasksCountEl.textContent = quickTasks.filter(t => !t.completed).length;
-            
-            // Calculate focus score based on completed tasks and big three completion
-            const completedTasks = quickTasks.filter(t => t.completed).length;
-            const bigThreeCompleted = bigThree.filter(item => item.trim() !== '').length;
-            const focusScore = Math.min(100, (completedTasks * 10) + (bigThreeCompleted * 20));
-            if (focusScoreEl) focusScoreEl.textContent = focusScore;
-        }
-
-        function loadBigThree() {
-            const inputs = document.querySelectorAll('#big-three-list input');
-            inputs.forEach((input, index) => {
-                if (bigThree[index]) {
-                    input.value = bigThree[index];
+                    project.style.display = 'none';
                 }
             });
         }
-
-        function exportAllNotes() {
-            const allData = {
-                notes: savedNotes,
-                tasks: quickTasks,
-                bigThree: bigThree,
-                exportDate: new Date().toISOString()
-            };
-            
-            const dataStr = JSON.stringify(allData, null, 2);
-            const dataBlob = new Blob([dataStr], {type: 'application/json'});
-            
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(dataBlob);
-            link.download = `ceo-notes-${new Date().toISOString().split('T')[0]}.json`;
-            link.click();
-        }
-
-        function speakToBrainDump() {
-            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                const recognition = new SpeechRecognition();
-                
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                
-                recognition.onstart = function() {
-                    showQuickFeedback('🎤 Listening... Speak your thoughts!');
-                };
-                
-                recognition.onresult = function(event) {
-                    let transcript = '';
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        transcript += event.results[i][0].transcript;
-                    }
-                    
-                    const textarea = document.getElementById('brain-dump-text');
-                    textarea.value = transcript;
-                };
-                
-                recognition.onerror = function() {
-                    showQuickFeedback('❌ Speech recognition error. Try typing instead.');
-                };
-                
-                recognition.start();
-                
-                // Stop after 30 seconds
-                setTimeout(() => {
-                    recognition.stop();
-                }, 30000);
-            } else {
-                alert('Speech recognition not supported in this browser. Try Chrome or Edge!');
-            }
-        }
-
-        function showQuickFeedback(message) {
-            // Create temporary feedback element
-            const feedback = document.createElement('div');
-            feedback.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: var(--success);
-                color: white;
-                padding: 12px 20px;
-                border-radius: 8px;
-                z-index: 10000;
-                font-weight: 600;
-                animation: slideIn 0.3s ease;
-            `;
-            feedback.textContent = message;
-            
-            document.body.appendChild(feedback);
-            
-            setTimeout(() => {
-                feedback.remove();
-            }, 3000);
-        }
-
-        function initializeCEONotes() {
-            if (document.getElementById('ceo-notes')) {
-                updateTasksDisplay();
-                updateNotesDisplay();
-                loadBigThree();
-                updateCEOStats();
-            }
-        }
-
-        /* ==================== SECTION 23: EVENT LISTENERS & INITIALIZATION ==================== */
-        /* Purpose: Keyboard shortcuts, error handling, startup */
-        /* Dependencies: All previous JavaScript */
-        /* CLAUDE NOTE: For future updates to this section, provide all event listeners, */
-        /* keyboard shortcuts, initialization code, and error handling setup. */
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey || e.metaKey) {
-                switch(e.key) {
-                    case '1': e.preventDefault(); showTab('overview'); break;
-                    case '2': e.preventDefault(); showTab('employee-report'); break;
-                    case '3': e.preventDefault(); showTab('project-report'); break;
-                    case '4': e.preventDefault(); showTab('productivity'); break;
-                    case '5': e.preventDefault(); showTab('ceo-notes'); break;
-                    case 'r': e.preventDefault(); refreshDashboard(); break;
-                    case 'e': e.preventDefault(); window.location.href = 'employee_dashboard.php?test_employee=1'; break;
-                }
-            }
-        });
-
-        // Initialize dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Enhanced Foxhole Dashboard with CEO Notes initialized');
-            
-            // Initialize CEO notes if on that tab
-            setTimeout(initializeCEONotes, 500);
-            
-            // Auto-refresh every 60 seconds
-            setInterval(() => {
-                if (document.getElementById('overview').classList.contains('active')) {
-                    console.log('Auto-refresh check - Overview tab active');
-                    // Uncomment for actual auto-refresh: refreshDashboard();
-                }
-            }, 60000);
-        });
-
-        // Auto-save brain dump every 30 seconds if there's content
-        setInterval(() => {
-            const brainDumpText = document.getElementById('brain-dump-text');
-            if (brainDumpText && brainDumpText.value.trim() && brainDumpText.value.length > 20) {
-                // Auto-save long brain dumps
-                saveBrainDump();
-                showQuickFeedback('🔄 Auto-saved brain dump');
-            }
-        }, 30000);
-
-        // Error handling
-        window.addEventListener('error', function(e) {
-            console.error('Dashboard Error:', e.error);
-        });
-
-        window.addEventListener('unhandledrejection', function(e) {
-            console.error('Unhandled Promise Rejection:', e.reason);
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Foxhole Dashboard Loaded Successfully');
         });
     </script>
 </body>
