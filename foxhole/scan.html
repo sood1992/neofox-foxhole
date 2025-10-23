@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HDD Catalog Tool</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        
+        .section h2 {
+            margin-top: 0;
+            color: #007AFF;
+            font-size: 18px;
+        }
+        
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            width: 300px;
+            margin: 5px;
+        }
+        
+        .progress {
+            background: #f0f0f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+            height: 24px;
+            display: none;
+        }
+        
+        .progress-bar {
+            background: #007AFF;
+            height: 100%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+        
+        .results {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        
+        .result-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .file { color: #333; }
+        .folder { color: #007AFF; font-weight: bold; }
+        
+        .stats {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007AFF;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .drive-list {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .drive-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        
+        .drive-item:hover {
+            background: #e8f4fd;
+        }
+        
+        .drive-item:last-child {
+            border-bottom: none;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗂️ HDD Catalog Tool</h1>
+        <p style="text-align: center; color: #666;">Catalog your drives to easily find old files and folders</p>
+        
+        <!-- Scan Section -->
+        <div class="section">
+            <h2>📁 Scan New Drive</h2>
+            <p>Click "Select Folder" and choose the root of your drive to scan all files and folders:</p>
+            
+            <button onclick="selectAndScanFolder()">Select Folder to Scan</button>
+            <button onclick="showAvailableDrives()">Show Available Drives</button>
+            
+            <div id="scanStatus" style="margin-top: 15px;"></div>
+            <div id="progressContainer" class="progress">
+                <div id="progressBar" class="progress-bar">0%</div>
+            </div>
+            
+            <div id="drivesList" class="drive-list" style="display: none; margin-top: 15px;"></div>
+        </div>
+        
+        <!-- Search Section -->
+        <div class="section">
+            <h2>🔍 Search Files & Folders</h2>
+            <input type="text" id="searchInput" placeholder="Enter filename to search..." onkeyup="handleSearchKey(event)">
+            <button onclick="searchFiles()">Search</button>
+            <button onclick="clearSearch()">Clear</button>
+            
+            <div>
+                <label><input type="radio" name="searchType" value="all" checked> All</label>
+                <label><input type="radio" name="searchType" value="files"> Files Only</label>
+                <label><input type="radio" name="searchType" value="folders"> Folders Only</label>
+            </div>
+            
+            <div id="searchResults" class="results" style="display: none;"></div>
+        </div>
+        
+        <!-- Statistics Section -->
+        <div class="section">
+            <h2>📊 Catalog Statistics</h2>
+            <button onclick="showStatistics()">Refresh Stats</button>
+            <button onclick="exportData()">Export All Data</button>
+            <button onclick="clearAllData()">Clear All Data</button>
+            
+            <div id="statisticsContainer"></div>
+        </div>
+        
+        <!-- Instructions -->
+        <div class="alert alert-info">
+            <strong>How to use:</strong><br>
+            1. Click "Select Folder to Scan" and choose your drive's root folder<br>
+            2. Wait for the scan to complete<br>
+            3. Use the search box to find files across all your catalogued drives<br>
+            4. Your data is saved in your browser and persists between sessions
+        </div>
+    </div>
+
+    <script>
+        // IndexedDB setup for storing catalog data
+        let db;
+        const dbName = 'HDDCatalog';
+        const dbVersion = 1;
+        
+        // Initialize database
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(dbName, dbVersion);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    
+                    // Create drives store
+                    if (!db.objectStoreNames.contains('drives')) {
+                        const drivesStore = db.createObjectStore('drives', { keyPath: 'id', autoIncrement: true });
+                        drivesStore.createIndex('name', 'name', { unique: false });
+                    }
+                    
+                    // Create entries store
+                    if (!db.objectStoreNames.contains('entries')) {
+                        const entriesStore = db.createObjectStore('entries', { keyPath: 'id', autoIncrement: true });
+                        entriesStore.createIndex('driveId', 'driveId', { unique: false });
+                        entriesStore.createIndex('name', 'name', { unique: false });
+                        entriesStore.createIndex('path', 'path', { unique: false });
+                    }
+                };
+            });
+        }
+        
+        // Add drive to database
+        async function addDrive(name, path) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['drives'], 'readwrite');
+                const store = transaction.objectStore('drives');
+                
+                const drive = {
+                    name: name,
+                    path: path,
+                    scanDate: new Date(),
+                    fileCount: 0,
+                    folderCount: 0
+                };
+                
+                const request = store.add(drive);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        // Add entry to database
+        async function addEntry(driveId, name, path, isDirectory, size = 0) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['entries'], 'readwrite');
+                const store = transaction.objectStore('entries');
+                
+                const entry = {
+                    driveId: driveId,
+                    name: name,
+                    path: path,
+                    isDirectory: isDirectory,
+                    size: size,
+                    scanDate: new Date()
+                };
+                
+                const request = store.add(entry);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        // Show available drives (for macOS)
+        function showAvailableDrives() {
+            const drivesList = document.getElementById('drivesList');
+            drivesList.style.display = 'block';
+            drivesList.innerHTML = `
+                <div class="alert alert-info">
+                    <strong>Common Mac Drive Locations:</strong><br>
+                    • /Volumes/ - External drives appear here<br>
+                    • /Users/[username]/ - Your user folder<br>
+                    • /Applications/ - Applications<br>
+                    • /System/ - System files<br><br>
+                    <strong>To scan an external drive:</strong> Use "Select Folder" and navigate to /Volumes/[YourDriveName]
+                </div>
+            `;
+        }
+        
+        // Select and scan folder
+        async function selectAndScanFolder() {
+            try {
+                // Use the modern File System Access API
+                const dirHandle = await window.showDirectoryPicker();
+                await scanDirectory(dirHandle);
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    showStatus('Scan cancelled', 'warning');
+                } else {
+                    showStatus('Error: ' + error.message, 'warning');
+                }
+            }
+        }
+        
+        // Scan directory
+        async function scanDirectory(dirHandle) {
+            showStatus('Starting scan...', 'info');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            progressContainer.style.display = 'block';
+            
+            try {
+                // Create drive entry
+                const driveName = dirHandle.name + '_' + Date.now();
+                const driveId = await addDrive(driveName, dirHandle.name);
+                
+                let fileCount = 0;
+                let folderCount = 0;
+                let processedCount = 0;
+                
+                // First pass: count total items
+                const totalItems = await countItems(dirHandle);
+                
+                // Second pass: process items
+                async function processDirectory(handle, path = '') {
+                    for await (const [name, childHandle] of handle.entries()) {
+                        const fullPath = path ? `${path}/${name}` : name;
+                        
+                        if (childHandle.kind === 'directory') {
+                            folderCount++;
+                            await addEntry(driveId, name, fullPath, true);
+                            await processDirectory(childHandle, fullPath);
+                        } else {
+                            fileCount++;
+                            try {
+                                const file = await childHandle.getFile();
+                                await addEntry(driveId, name, fullPath, false, file.size);
+                            } catch (e) {
+                                await addEntry(driveId, name, fullPath, false, 0);
+                            }
+                        }
+                        
+                        processedCount++;
+                        const progress = Math.round((processedCount / totalItems) * 100);
+                        progressBar.style.width = progress + '%';
+                        progressBar.textContent = `${progress}% (${processedCount}/${totalItems})`;
+                        
+                        // Allow UI updates
+                        if (processedCount % 50 === 0) {
+                            await new Promise(resolve => setTimeout(resolve, 1));
+                        }
+                    }
+                }
+                
+                await processDirectory(dirHandle);
+                
+                // Update drive statistics
+                await updateDriveStats(driveId, fileCount, folderCount);
+                
+                progressContainer.style.display = 'none';
+                showStatus(`Scan complete! Found ${fileCount} files and ${folderCount} folders in drive "${driveName}"`, 'success');
+                
+            } catch (error) {
+                progressContainer.style.display = 'none';
+                showStatus('Error during scan: ' + error.message, 'warning');
+            }
+        }
+        
+        // Count items for progress tracking
+        async function countItems(dirHandle) {
+            let count = 0;
+            
+            async function countInDirectory(handle) {
+                for await (const [name, childHandle] of handle.entries()) {
+                    count++;
+                    if (childHandle.kind === 'directory') {
+                        await countInDirectory(childHandle);
+                    }
+                }
+            }
+            
+            await countInDirectory(dirHandle);
+            return count;
+        }
+        
+        // Update drive statistics
+        async function updateDriveStats(driveId, fileCount, folderCount) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['drives'], 'readwrite');
+                const store = transaction.objectStore('drives');
+                
+                const request = store.get(driveId);
+                request.onsuccess = () => {
+                    const drive = request.result;
+                    drive.fileCount = fileCount;
+                    drive.folderCount = folderCount;
+                    
+                    const updateRequest = store.put(drive);
+                    updateRequest.onsuccess = () => resolve();
+                    updateRequest.onerror = () => reject(updateRequest.error);
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        // Search files
+        async function searchFiles() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            if (!query) {
+                showStatus('Please enter a search term', 'warning');
+                return;
+            }
+            
+            const searchType = document.querySelector('input[name="searchType"]:checked').value;
+            const results = await performSearch(query, searchType);
+            displaySearchResults(results);
+        }
+        
+        // Perform search
+        async function performSearch(query, searchType) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['entries', 'drives'], 'readonly');
+                const entriesStore = transaction.objectStore('entries');
+                const drivesStore = transaction.objectStore('drives');
+                
+                const results = [];
+                const request = entriesStore.openCursor();
+                
+                request.onsuccess = async (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        const entry = cursor.value;
+                        const nameMatch = entry.name.toLowerCase().includes(query);
+                        
+                        let typeMatch = true;
+                        if (searchType === 'files' && entry.isDirectory) typeMatch = false;
+                        if (searchType === 'folders' && !entry.isDirectory) typeMatch = false;
+                        
+                        if (nameMatch && typeMatch) {
+                            // Get drive name
+                            const driveRequest = drivesStore.get(entry.driveId);
+                            driveRequest.onsuccess = () => {
+                                const drive = driveRequest.result;
+                                results.push({
+                                    ...entry,
+                                    driveName: drive ? drive.name : 'Unknown'
+                                });
+                                
+                                if (results.length >= 100) { // Limit results
+                                    resolve(results);
+                                    return;
+                                }
+                            };
+                        }
+                        cursor.continue();
+                    } else {
+                        resolve(results);
+                    }
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        // Display search results
+        function displaySearchResults(results) {
+            const container = document.getElementById('searchResults');
+            container.style.display = 'block';
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="result-item">No results found</div>';
+                return;
+            }
+            
+            let html = `<div style="margin-bottom: 10px;"><strong>Found ${results.length} results:</strong></div>`;
+            
+            results.forEach(result => {
+                const icon = result.isDirectory ? '📁' : '📄';
+                const className = result.isDirectory ? 'folder' : 'file';
+                const size = result.size > 0 ? ` (${formatFileSize(result.size)})` : '';
+                
+                html += `
+                    <div class="result-item ${className}">
+                        ${icon} <strong>${result.driveName}</strong>: ${result.path}${size}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Show statistics
+        async function showStatistics() {
+            const stats = await getStatistics();
+            displayStatistics(stats);
+        }
+        
+        // Get statistics
+        async function getStatistics() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['drives', 'entries'], 'readonly');
+                const drivesStore = transaction.objectStore('drives');
+                const entriesStore = transaction.objectStore('entries');
+                
+                const stats = {
+                    totalDrives: 0,
+                    totalFiles: 0,
+                    totalFolders: 0,
+                    totalSize: 0,
+                    drives: []
+                };
+                
+                const drivesRequest = drivesStore.getAll();
+                drivesRequest.onsuccess = () => {
+                    const drives = drivesRequest.result;
+                    stats.totalDrives = drives.length;
+                    stats.drives = drives;
+                    
+                    const entriesRequest = entriesStore.getAll();
+                    entriesRequest.onsuccess = () => {
+                        const entries = entriesRequest.result;
+                        
+                        entries.forEach(entry => {
+                            if (entry.isDirectory) {
+                                stats.totalFolders++;
+                            } else {
+                                stats.totalFiles++;
+                                stats.totalSize += entry.size || 0;
+                            }
+                        });
+                        
+                        resolve(stats);
+                    };
+                    entriesRequest.onerror = () => reject(entriesRequest.error);
+                };
+                drivesRequest.onerror = () => reject(drivesRequest.error);
+            });
+        }
+        
+        // Display statistics
+        function displayStatistics(stats) {
+            const container = document.getElementById('statisticsContainer');
+            
+            let html = `
+                <div class="stats">
+                    <h3>Overall Statistics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number">${stats.totalDrives}</div>
+                            <div class="stat-label">Drives Cataloged</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${stats.totalFiles.toLocaleString()}</div>
+                            <div class="stat-label">Total Files</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${stats.totalFolders.toLocaleString()}</div>
+                            <div class="stat-label">Total Folders</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${formatFileSize(stats.totalSize)}</div>
+                            <div class="stat-label">Total Size</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (stats.drives.length > 0) {
+                html += '<h3>Individual Drives</h3>';
+                stats.drives.forEach(drive => {
+                    html += `
+                        <div class="drive-item">
+                            <strong>📀 ${drive.name}</strong><br>
+                            Scanned: ${new Date(drive.scanDate).toLocaleDateString()}<br>
+                            Files: ${drive.fileCount.toLocaleString()}, Folders: ${drive.folderCount.toLocaleString()}
+                        </div>
+                    `;
+                });
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // Export data
+        async function exportData() {
+            try {
+                const stats = await getStatistics();
+                const allEntries = await getAllEntries();
+                
+                const exportData = {
+                    exportDate: new Date().toISOString(),
+                    statistics: stats,
+                    entries: allEntries
+                };
+                
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `hdd_catalog_export_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                
+                URL.revokeObjectURL(url);
+                showStatus('Data exported successfully!', 'success');
+            } catch (error) {
+                showStatus('Error exporting data: ' + error.message, 'warning');
+            }
+        }
+        
+        // Get all entries
+        async function getAllEntries() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['entries'], 'readonly');
+                const store = transaction.objectStore('entries');
+                
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        // Clear all data
+        async function clearAllData() {
+            if (confirm('Are you sure you want to clear all catalog data? This cannot be undone.')) {
+                try {
+                    const transaction = db.transaction(['drives', 'entries'], 'readwrite');
+                    await transaction.objectStore('drives').clear();
+                    await transaction.objectStore('entries').clear();
+                    
+                    document.getElementById('searchResults').style.display = 'none';
+                    document.getElementById('statisticsContainer').innerHTML = '';
+                    showStatus('All data cleared successfully!', 'success');
+                } catch (error) {
+                    showStatus('Error clearing data: ' + error.message, 'warning');
+                }
+            }
+        }
+        
+        // Clear search
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').style.display = 'none';
+        }
+        
+        // Handle search key press
+        function handleSearchKey(event) {
+            if (event.key === 'Enter') {
+                searchFiles();
+            }
+        }
+        
+        // Show status message
+        function showStatus(message, type = 'info') {
+            const container = document.getElementById('scanStatus');
+            const alertClass = `alert alert-${type}`;
+            container.innerHTML = `<div class="${alertClass}">${message}</div>`;
+            
+            // Auto-hide success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    container.innerHTML = '';
+                }, 5000);
+            }
+        }
+        
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+        
+        // Initialize app
+        async function initApp() {
+            try {
+                await initDB();
+                showStatus('Ready to scan drives!', 'success');
+                showStatistics(); // Show stats on load
+            } catch (error) {
+                showStatus('Error initializing database: ' + error.message, 'warning');
+            }
+        }
+        
+        // Start the app
+        initApp();
+    </script>
+</body>
+</html>
