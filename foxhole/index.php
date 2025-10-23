@@ -15,48 +15,27 @@ $_SESSION = array();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Foxhole - Team Management Portal</title>
+    <title>Welcome to Foxhole - Team Management Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    
-    <style>
-        :root {
-            --primary: #4F46E5;
-            --primary-light: #6366F1;
-            --secondary: #10B981;
-            --warning: #F59E0B;
-            --danger: #EF4444;
-            --success: #10B981;
-            --info: #3B82F6;
-            
-            --gray-50: #F8FAFC;
-            --gray-100: #F1F5F9;
-            --gray-200: #E2E8F0;
-            --gray-300: #CBD5E1;
-            --gray-400: #94A3B8;
-            --gray-500: #64748B;
-            --gray-600: #475569;
-            --gray-700: #334155;
-            --gray-800: #1E293B;
-            --gray-900: #0F172A;
-            
-            --bg-primary: #FAFAFB;
-            --bg-secondary: #FFFFFF;
-            
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            
-            --radius-md: 12px;
-            --radius-lg: 16px;
-            --radius-xl: 24px;
-        }
 
+    <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #17a2b8;
+            --primary-dark: #138496;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --gray-100: #f8f9fa;
+            --gray-200: #e9ecef;
+            --gray-600: #6c757d;
+            --gray-800: #343a40;
         }
 
         body {
@@ -69,203 +48,245 @@ $_SESSION = array();
             padding: 20px;
         }
 
-        .login-container {
+        .login-wrapper {
             width: 100%;
-            max-width: 1200px;
+            max-width: 1300px;
+            animation: fadeIn 0.5s ease;
         }
 
-        .logo-section {
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Header Section */
+        .login-header {
             text-align: center;
             margin-bottom: 3rem;
             color: white;
         }
 
-        .logo {
+        .brand {
             display: inline-flex;
             align-items: center;
-            gap: 20px;
+            gap: 16px;
             margin-bottom: 1rem;
         }
 
-        .logo-icon {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.2);
+        .brand-icon {
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
-            border-radius: var(--radius-xl);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
-            color: white;
-            box-shadow: var(--shadow-xl);
-        }
-
-        .logo-text {
-            font-size: 48px;
-            font-weight: 900;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .tagline {
-            font-size: 20px;
-            opacity: 0.9;
-            font-weight: 500;
-        }
-
-        .login-options {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .login-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: var(--radius-xl);
-            padding: 2.5rem;
-            box-shadow: var(--shadow-xl);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            transition: all 0.3s ease;
-        }
-
-        .login-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 30px 40px rgba(0,0,0,0.2);
-        }
-
-        .card-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        .card-icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 1rem;
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            border-radius: var(--radius-lg);
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 36px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .brand-name {
+            font-size: 3rem;
+            font-weight: 900;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .login-subtitle {
+            font-size: 1.125rem;
+            opacity: 0.95;
+            font-weight: 500;
+        }
+
+        /* Login Cards Grid */
+        .login-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--card-color, var(--primary)), var(--card-color-light, var(--primary)));
+        }
+
+        .login-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.2);
+        }
+
+        .login-card.admin {
+            --card-color: var(--primary);
+            --card-color-light: #5bc0de;
+        }
+
+        .login-card.manager {
+            --card-color: var(--warning);
+            --card-color-light: #ffd54f;
+        }
+
+        .login-card.employee {
+            --card-color: var(--success);
+            --card-color-light: #4caf50;
+        }
+
+        .card-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-icon {
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 1rem;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
             color: white;
-            box-shadow: var(--shadow-md);
+            background: linear-gradient(135deg, var(--card-color), var(--card-color-light));
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
         }
 
         .card-title {
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--gray-900);
-            margin-bottom: 8px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--gray-800);
+            margin-bottom: 0.5rem;
         }
 
         .card-subtitle {
-            font-size: 16px;
+            font-size: 0.875rem;
             color: var(--gray-600);
         }
 
+        /* Form Elements */
         .form-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
 
         .form-label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 0.5rem;
             font-weight: 600;
-            color: var(--gray-700);
-            font-size: 14px;
+            font-size: 0.875rem;
+            color: var(--gray-800);
         }
 
-        .form-input {
+        .form-control {
             width: 100%;
-            padding: 14px 18px;
+            padding: 12px 16px;
             border: 2px solid var(--gray-200);
-            border-radius: var(--radius-md);
-            font-size: 16px;
-            transition: all 0.3s ease;
+            border-radius: 8px;
+            font-size: 0.9375rem;
             font-family: inherit;
+            transition: all 0.2s ease;
         }
 
-        .form-input:focus {
+        .form-control:focus {
             outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+            border-color: var(--card-color);
+            box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.1);
         }
 
+        .form-control::placeholder {
+            color: var(--gray-600);
+        }
+
+        /* Buttons */
         .btn {
             width: 100%;
-            padding: 16px 24px;
+            padding: 14px 24px;
             border: none;
-            border-radius: var(--radius-md);
-            font-weight: 700;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9375rem;
             cursor: pointer;
             transition: all 0.3s ease;
-            font-size: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 8px;
+            font-family: inherit;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            background: linear-gradient(135deg, var(--card-color), var(--card-color-light));
             color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
         }
 
-        .btn-secondary {
-            background: var(--gray-100);
-            color: var(--gray-700);
-            border: 2px solid var(--gray-200);
-            margin-top: 1rem;
+        .btn-primary:active {
+            transform: translateY(0);
         }
 
-        .btn-secondary:hover {
-            background: var(--gray-200);
-        }
-
-        .error-message {
-            display: none;
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--danger);
+        /* Alert Messages */
+        .alert {
             padding: 12px 16px;
-            border-radius: var(--radius-md);
+            border-radius: 8px;
             margin-bottom: 1rem;
-            font-size: 14px;
-            font-weight: 600;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .success-message {
+            font-size: 0.875rem;
+            font-weight: 500;
             display: none;
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--success);
-            padding: 12px 16px;
-            border-radius: var(--radius-md);
-            margin-bottom: 1rem;
-            font-size: 14px;
-            font-weight: 600;
-            border: 1px solid rgba(16, 185, 129, 0.3);
         }
 
-        @media (max-width: 768px) {
-            .login-options {
-                grid-template-columns: 1fr;
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
             }
-            
-            .logo-text {
-                font-size: 36px;
+            to {
+                opacity: 1;
+                transform: translateY(0);
             }
         }
 
-        /* Loading animation */
-        .loading {
+        /* Loading Overlay */
+        .loading-overlay {
             display: none;
             position: fixed;
             top: 0;
@@ -278,10 +299,14 @@ $_SESSION = array();
             justify-content: center;
         }
 
+        .loading-overlay.active {
+            display: flex;
+        }
+
         .loading-content {
             background: white;
             padding: 2rem;
-            border-radius: var(--radius-lg);
+            border-radius: 12px;
             text-align: center;
         }
 
@@ -289,289 +314,264 @@ $_SESSION = array();
             width: 50px;
             height: 50px;
             border: 4px solid var(--gray-200);
-            border-top: 4px solid var(--primary);
+            border-top-color: var(--primary);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            animation: spin 0.8s linear infinite;
             margin: 0 auto 1rem;
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Footer */
+        .login-footer {
+            text-align: center;
+            margin-top: 2rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.875rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .brand-name {
+                font-size: 2rem;
+            }
+
+            .login-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .login-card {
+                padding: 1.5rem;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Loading Screen -->
-    <div class="loading" id="loadingScreen">
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-content">
             <div class="spinner"></div>
             <p>Logging you in...</p>
         </div>
     </div>
 
-    <div class="login-container">
-        <!-- Logo Section -->
-        <div class="logo-section">
-            <div class="logo">
-                <div class="logo-icon">
+    <div class="login-wrapper">
+        <!-- Header -->
+        <div class="login-header">
+            <div class="brand">
+                <div class="brand-icon">
                     <i class="fas fa-paw"></i>
                 </div>
-                <div class="logo-text">Foxhole</div>
+                <div class="brand-name">Foxhole</div>
             </div>
-            <p class="tagline">Team Management Portal - Neofox Media</p>
+            <p class="login-subtitle">Team Management Portal - Neofox Media</p>
         </div>
 
-        <!-- Login Options -->
-        <div class="login-options">
-            <!-- Admin Login -->
-            <div class="login-card">
+        <!-- Login Cards -->
+        <div class="login-grid">
+            <!-- Admin Card -->
+            <div class="login-card admin">
                 <div class="card-header">
                     <div class="card-icon">
                         <i class="fas fa-crown"></i>
                     </div>
-                    <h2 class="card-title">Fox Admin Panel</h2>
-                    <p class="card-subtitle"></p>
+                    <h2 class="card-title">Admin Panel</h2>
+                    <p class="card-subtitle">Full system access & oversight</p>
                 </div>
-                
-                <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
-                    <div class="success-message" id="adminSuccess"></div>
-                    <div class="error-message" id="adminError"></div>
-                    
+
+                <form id="adminForm" onsubmit="handleLogin(event, 'admin')">
+                    <div class="alert alert-error" id="adminError"></div>
+                    <div class="alert alert-success" id="adminSuccess"></div>
+
                     <div class="form-group">
                         <label class="form-label">Admin Password</label>
-                        <input type="password" class="form-input" id="adminPassword" 
-                               placeholder="Enter admin password" required>
+                        <input type="password"
+                               class="form-control"
+                               id="adminPassword"
+                               placeholder="Enter admin password"
+                               required>
                     </div>
-                    
+
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-lock"></i>
-                        Access Admin Panel
+                        <span>Access Admin Panel</span>
                     </button>
                 </form>
             </div>
 
-            <!-- Project Manager Login -->
-            <div class="login-card">
+            <!-- Project Manager Card -->
+            <div class="login-card manager">
                 <div class="card-header">
-                    <div class="card-icon" style="background: linear-gradient(135deg, var(--warning), #FBBF24);">
+                    <div class="card-icon">
                         <i class="fas fa-tasks"></i>
                     </div>
                     <h2 class="card-title">Project Manager</h2>
-                    <p class="card-subtitle">Team & Project Management</p>
+                    <p class="card-subtitle">Team & project management</p>
                 </div>
-                
-                <form id="pmLoginForm" onsubmit="handlePMLogin(event)">
-                    <div class="success-message" id="pmSuccess"></div>
-                    <div class="error-message" id="pmError"></div>
-                    
+
+                <form id="pmForm" onsubmit="handleLogin(event, 'pm')">
+                    <div class="alert alert-error" id="pmError"></div>
+                    <div class="alert alert-success" id="pmSuccess"></div>
+
                     <div class="form-group">
                         <label class="form-label">Manager Password</label>
-                        <input type="password" class="form-input" id="pmPassword" 
-                               placeholder="Enter manager password" required>
+                        <input type="password"
+                               class="form-control"
+                               id="pmPassword"
+                               placeholder="Enter manager password"
+                               required>
                     </div>
-                    
-                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, var(--warning), #FBBF24);">
+
+                    <button type="submit" class="btn btn-primary">
                         <i class="fas fa-unlock"></i>
-                        Access Manager Panel
+                        <span>Access Manager Panel</span>
                     </button>
                 </form>
             </div>
 
-            <!-- Employee Login -->
-            <div class="login-card">
+            <!-- Employee Card -->
+            <div class="login-card employee">
                 <div class="card-header">
-                    <div class="card-icon" style="background: linear-gradient(135deg, var(--success), #34D399);">
+                    <div class="card-icon">
                         <i class="fas fa-user"></i>
                     </div>
                     <h2 class="card-title">Team Member</h2>
-                    <p class="card-subtitle">View your tasks & updates</p>
+                    <p class="card-subtitle">Your tasks & attendance</p>
                 </div>
-                
-                <form id="employeeLoginForm" onsubmit="handleEmployeeLogin(event)">
-                    <div class="success-message" id="employeeSuccess"></div>
-                    <div class="error-message" id="employeeError"></div>
-                    
+
+                <form id="employeeForm" onsubmit="handleLogin(event, 'employee')">
+                    <div class="alert alert-error" id="employeeError"></div>
+                    <div class="alert alert-success" id="employeeSuccess"></div>
+
                     <div class="form-group">
                         <label class="form-label">Your First Name</label>
-                        <input type="text" class="form-input" id="employeeName" 
-                               placeholder="Enter your first name" required>
+                        <input type="text"
+                               class="form-control"
+                               id="employeeName"
+                               placeholder="Enter your first name"
+                               required>
                     </div>
-                    
-                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, var(--success), #34D399);">
+
+                    <button type="submit" class="btn btn-primary">
                         <i class="fas fa-sign-in-alt"></i>
-                        View My Dashboard
+                        <span>View My Dashboard</span>
                     </button>
                 </form>
             </div>
         </div>
+
+        <!-- Footer -->
+        <div class="login-footer">
+            <p>&copy; 2024 Neofox Media. All rights reserved.</p>
+        </div>
     </div>
 
     <script>
+        // Show loading overlay
         function showLoading() {
-            document.getElementById('loadingScreen').style.display = 'flex';
+            document.getElementById('loadingOverlay').classList.add('active');
         }
 
+        // Hide loading overlay
         function hideLoading() {
-            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('loadingOverlay').classList.remove('active');
         }
 
-        function showError(elementId, message) {
-            const errorElement = document.getElementById(elementId);
-            const successElement = document.getElementById(elementId.replace('Error', 'Success'));
-            
-            // Hide success message
-            successElement.style.display = 'none';
-            
-            // Show error message
-            errorElement.textContent = message;
-            errorElement.style.display = 'block';
-            
+        // Show error message
+        function showError(type, message) {
+            const errorEl = document.getElementById(`${type}Error`);
+            const successEl = document.getElementById(`${type}Success`);
+
+            successEl.classList.remove('show');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+
             setTimeout(() => {
-                errorElement.style.display = 'none';
+                errorEl.classList.remove('show');
             }, 5000);
         }
 
-        function showSuccess(elementId, message) {
-            const successElement = document.getElementById(elementId);
-            const errorElement = document.getElementById(elementId.replace('Success', 'Error'));
-            
-            // Hide error message
-            errorElement.style.display = 'none';
-            
-            // Show success message
-            successElement.textContent = message;
-            successElement.style.display = 'block';
+        // Show success message
+        function showSuccess(type, message) {
+            const errorEl = document.getElementById(`${type}Error`);
+            const successEl = document.getElementById(`${type}Success`);
+
+            errorEl.classList.remove('show');
+            successEl.textContent = message;
+            successEl.classList.add('show');
         }
 
-        async function handleAdminLogin(event) {
+        // Handle login
+        async function handleLogin(event, type) {
             event.preventDefault();
-            const password = document.getElementById('adminPassword').value;
-            
+
+            let action, credential;
+
+            if (type === 'admin') {
+                action = 'admin_login';
+                credential = document.getElementById('adminPassword').value;
+            } else if (type === 'pm') {
+                action = 'pm_login';
+                credential = document.getElementById('pmPassword').value;
+            } else {
+                action = 'employee_login';
+                credential = document.getElementById('employeeName').value.trim();
+
+                if (credential.length < 2) {
+                    showError('employee', 'Please enter a valid name');
+                    return;
+                }
+            }
+
             showLoading();
-            
+
             try {
-                console.log('Sending admin login request...');
-                
+                const formData = new URLSearchParams();
+                formData.append('action', action);
+
+                if (type === 'employee') {
+                    formData.append('name', credential);
+                } else {
+                    formData.append('password', credential);
+                }
+
                 const response = await fetch('auth.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                     },
-                    body: `action=admin_login&password=${encodeURIComponent(password)}`
+                    body: formData.toString()
                 });
-                
-                console.log('Response status:', response.status);
-                console.log('Response headers:', [...response.headers.entries()]);
-                
+
                 const text = await response.text();
-                console.log('Raw response:', text);
-                
-                try {
-                    const result = JSON.parse(text);
-                    console.log('Parsed result:', result);
-                    
-                    if (result.success) {
-                        showSuccess('adminSuccess', '✅ Login successful! Redirecting...');
-                        setTimeout(() => {
-                            window.location.href = result.redirect;
-                        }, 1000);
-                    } else {
-                        hideLoading();
-                        showError('adminError', result.error || 'Login failed');
-                        document.getElementById('adminPassword').value = '';
+                const result = JSON.parse(text);
+
+                if (result.success) {
+                    showSuccess(type, 'Login successful! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = result.redirect;
+                    }, 1000);
+                } else {
+                    hideLoading();
+                    showError(type, result.error || 'Login failed. Please try again.');
+
+                    // Clear password fields
+                    if (type !== 'employee') {
+                        event.target.querySelector('input[type="password"]').value = '';
                     }
-                } catch (parseError) {
-                    hideLoading();
-                    console.error('JSON parse error:', parseError);
-                    showError('adminError', 'Server error. Please try again.');
-                }
-                
-            } catch (error) {
-                hideLoading();
-                console.error('Network error:', error);
-                showError('adminError', 'Connection error. Please try again.');
-            }
-        }
-
-        async function handlePMLogin(event) {
-            event.preventDefault();
-            const password = document.getElementById('pmPassword').value;
-            
-            showLoading();
-            
-            try {
-                const response = await fetch('auth.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=pm_login&password=${encodeURIComponent(password)}`
-                });
-                
-                const text = await response.text();
-                const result = JSON.parse(text);
-                
-                if (result.success) {
-                    showSuccess('pmSuccess', '✅ Login successful! Redirecting...');
-                    setTimeout(() => {
-                        window.location.href = result.redirect;
-                    }, 1000);
-                } else {
-                    hideLoading();
-                    showError('pmError', result.error || 'Login failed');
-                    document.getElementById('pmPassword').value = '';
                 }
             } catch (error) {
                 hideLoading();
                 console.error('Login error:', error);
-                showError('pmError', 'Connection error. Please try again.');
+                showError(type, 'Connection error. Please try again.');
             }
         }
 
-        async function handleEmployeeLogin(event) {
-            event.preventDefault();
-            const name = document.getElementById('employeeName').value.trim();
-            
-            if (name.length < 2) {
-                showError('employeeError', 'Please enter a valid name.');
-                return;
-            }
-            
-            showLoading();
-            
-            try {
-                const response = await fetch('auth.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=employee_login&name=${encodeURIComponent(name)}`
-                });
-                
-                const text = await response.text();
-                const result = JSON.parse(text);
-                
-                if (result.success) {
-                    showSuccess('employeeSuccess', '✅ Login successful! Redirecting...');
-                    setTimeout(() => {
-                        window.location.href = result.redirect;
-                    }, 1000);
-                } else {
-                    hideLoading();
-                    showError('employeeError', result.error || 'Employee not found');
-                    document.getElementById('employeeName').value = '';
-                }
-            } catch (error) {
-                hideLoading();
-                console.error('Login error:', error);
-                showError('employeeError', 'Connection error. Please try again.');
-            }
-        }
-
-        // Auto-focus first input
+        // Auto-focus first input on page load
         window.addEventListener('load', () => {
-            document.querySelector('.form-input').focus();
+            document.querySelector('input').focus();
         });
     </script>
 </body>
