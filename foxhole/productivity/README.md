@@ -10,6 +10,8 @@ Foxhole is Neofox's ADHD-friendly operations cockpit for a full-stack marketing 
 - **Milestones, meeting notes, and idea bank** to keep creative delivery, rituals, and experimentation in one view.
 - **Employee focus planner** with one-click timers, inline status changes, and daily wellbeing check-ins.
 - **Energy analytics and reports** for weekly/monthly windows including utilisation, pipeline balance, and mood trends.
+- **Revenue intelligence** with invoice tracking, expense logging, and live project margin calculations.
+- **Freelancer hub & automation alerts** to staff contractors quickly and surface overdue deadlines, retainers, invoices, and wellbeing dips.
 
 ## Getting started
 1. Create a MySQL database (default `foxhole_productivity`).
@@ -23,16 +25,16 @@ Foxhole is Neofox's ADHD-friendly operations cockpit for a full-stack marketing 
 
 ## Modules at a glance
 - `dashboard.php`: Adaptive UI for each role with forms to launch projects, log milestones, document meetings, submit check-ins, and capture ideas.
-- `reports.php`: Export-friendly analytics including retainer coverage, pipeline totals, project velocity, and energy journal.
+- `reports.php`: Export-friendly analytics including retainer coverage, pipeline totals, project velocity, financial performance, and energy journal plus automation alerts.
 - `api/time.php`: Lightweight JSON endpoint for the focus timer, supporting optional completion notes.
 - `includes/functions.php`: Shared helper library for authentication, formatting, metrics queries, and persistence helpers.
 - `assets/css/style.css`: Minimal, high-contrast styling optimised for executive clarity and ADHD-friendly scanning.
 - `assets/js/timer.js`: Client script for the timer toast/prompt flow.
 
 ## Database overview
-The schema adds supporting tables for clients, capacity planning, wellbeing pulses, meeting notes, idea bank, and richer project metadata. Seed data gives you:
+The schema adds supporting tables for clients, capacity planning, wellbeing pulses, meeting notes, idea bank, freelancer resourcing, invoicing, expenses, and richer project metadata. Seed data gives you:
 - 3 demo users with titles, focus colours, and sample capacity plans.
-- Live demo clients, projects, milestones, time entries, wellbeing check-ins, ideas, and meeting notes.
+- Live demo clients, projects, milestones, time entries, wellbeing check-ins, ideas, meeting notes, freelancer assignments, invoices, expenses, and automation alerts.
 
 Re-running `schema.sql` will drop/overwrite existing data; take backups before applying to live environments.
 

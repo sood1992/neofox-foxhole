@@ -32,11 +32,29 @@ switch ($range) {
         break;
 }
 
+$managerFilter = $user['role'] === 'manager' ? (int) $user['id'] : null;
+
+sync_automation_alerts($pdo, $startDate->format('Y-m-d H:i:s'), $endDate->format('Y-m-d H:i:s'));
+
 $summary = get_team_time_summary($pdo, $startDate->format('Y-m-d H:i:s'), $endDate->format('Y-m-d H:i:s'), $employeeId ?: null);
 $clients = get_clients_with_metrics($pdo, $startDate->format('Y-m-d H:i:s'), $endDate->format('Y-m-d H:i:s'));
-$pipeline = get_pipeline_distribution($pdo, $user['role'] === 'manager' ? (int) $user['id'] : null);
+$pipeline = get_pipeline_distribution($pdo, $managerFilter);
 $energyFeed = get_recent_checkins($pdo, 40, $employeeId ?: null);
 $avgEnergy = compute_focus_score($energyFeed);
+$financials = get_profitability_overview($pdo, $managerFilter);
+$invoicePipeline = get_invoice_pipeline($pdo, $managerFilter);
+$freelancers = get_freelancers($pdo);
+$freelancerAssignments = get_freelancer_assignments($pdo, $managerFilter);
+$alerts = get_active_alerts($pdo, $managerFilter);
+
+$financialTotals = [
+    'invoiced' => array_sum(array_column($financials, 'invoice_total')),
+    'paid' => array_sum(array_column($financials, 'invoice_paid')),
+    'expenses' => array_sum(array_column($financials, 'expense_total')),
+    'internal_cost' => array_sum(array_column($financials, 'internal_cost')),
+];
+$financialTotals['outstanding'] = $financialTotals['invoiced'] - $financialTotals['paid'];
+$financialTotals['margin'] = $financialTotals['paid'] - ($financialTotals['expenses'] + $financialTotals['internal_cost']);
 
 // project level roll-up
 $query = 'SELECT p.id, p.name, p.status, p.due_date,
@@ -190,6 +208,128 @@ $employees = get_users_by_role($pdo, 'employee');
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="card" style="margin-top:2rem;">
+                <h2>Financial performance <span>💰</span></h2>
+                <div class="chip-row" style="margin-bottom:1rem;">
+                    <span class="chip">Paid <?= format_currency($financialTotals['paid']) ?></span>
+                    <span class="chip">Outstanding <?= format_currency($financialTotals['outstanding']) ?></span>
+                    <span class="chip">Expenses <?= format_currency($financialTotals['expenses']) ?></span>
+                    <span class="chip">Margin <?= format_currency($financialTotals['margin']) ?></span>
+                </div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Client</th>
+                            <th>Paid</th>
+                            <th>Outstanding</th>
+                            <th>Total cost</th>
+                            <th>Margin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($financials as $row):
+                            $outstanding = $row['invoice_total'] - $row['invoice_paid'];
+                            $marginPercent = $row['invoice_paid'] ? ($row['realized_margin'] / $row['invoice_paid']) * 100 : null;
+                        ?>
+                            <tr>
+                                <td><?= htmlspecialchars($row['name']) ?></td>
+                                <td><?= htmlspecialchars($row['client_name'] ?? 'Internal') ?></td>
+                                <td><?= format_currency((float) $row['invoice_paid']) ?></td>
+                                <td><?= format_currency((float) $outstanding) ?></td>
+                                <td><?= format_currency((float) $row['total_cost']) ?></td>
+                                <td>
+                                    <?= format_currency((float) $row['realized_margin']) ?>
+                                    <div class="muted tiny"><?= $marginPercent ? number_format($marginPercent, 0) : '—' ?>%</div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php if (empty($financials)): ?>
+                            <tr><td colspan="6" class="muted">No projects to report.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card" style="margin-top:2rem;">
+                <h2>Invoice pipeline <span>🧾</span></h2>
+                <ul class="invoice-pipeline">
+                    <?php foreach ($invoicePipeline as $invoice): ?>
+                        <li class="invoice <?= 'status-' . htmlspecialchars($invoice['status']) ?>">
+                            <div style="display:flex; justify-content: space-between; gap:1rem;">
+                                <div>
+                                    <strong><?= htmlspecialchars($invoice['client_name']) ?></strong>
+                                    <?php if ($invoice['project_name']): ?><div class="tiny muted">Project <?= htmlspecialchars($invoice['project_name']) ?></div><?php endif; ?>
+                                </div>
+                                <div class="tiny">Due <?= $invoice['due_date'] ?: '—' ?> • <?= ucfirst($invoice['status']) ?></div>
+                            </div>
+                            <div class="muted tiny">Amount <?= format_currency((float) $invoice['amount']) ?> • Issued <?= (new DateTimeImmutable($invoice['issue_date']))->format('M d, Y') ?></div>
+                            <?php if ($invoice['notes']): ?><div class="tiny">Note: <?= htmlspecialchars($invoice['notes']) ?></div><?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                    <?php if (empty($invoicePipeline)): ?>
+                        <li class="muted tiny">No invoices logged for this range.</li>
+                    <?php endif; ?>
+                </ul>
+            </div>
+
+            <div class="card" style="margin-top:2rem;">
+                <h2>Freelancer network <span>🤝</span></h2>
+                <div class="grid two-col" style="gap:1.5rem;">
+                    <div>
+                        <h3 class="subhead">Roster</h3>
+                        <ul class="freelancer-list">
+                            <?php foreach ($freelancers as $freelancer): ?>
+                                <li class="freelancer-card status-<?= htmlspecialchars($freelancer['status']) ?>">
+                                    <div>
+                                        <strong><?= htmlspecialchars($freelancer['name']) ?></strong>
+                                        <div class="muted tiny"><?= htmlspecialchars($freelancer['specialty'] ?? 'Multi-disciplinary') ?></div>
+                                        <div class="tiny">Rate <?= format_rate($freelancer['hourly_rate'] ? (float) $freelancer['hourly_rate'] : null) ?></div>
+                                        <?php if ($freelancer['available_from']): ?><div class="tiny">Next open <?= (new DateTimeImmutable($freelancer['available_from']))->format('M d') ?></div><?php endif; ?>
+                                    </div>
+                                    <span class="badge severity-<?= $freelancer['status'] === 'available' ? 'info' : ($freelancer['status'] === 'booked' ? 'watch' : 'urgent') ?>"><?= ucfirst($freelancer['status']) ?></span>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="subhead">Assignments</h3>
+                        <ul class="assignment-list">
+                            <?php foreach ($freelancerAssignments as $assignment): ?>
+                                <li>
+                                    <strong><?= htmlspecialchars($assignment['freelancer_name']) ?></strong>
+                                    <div class="muted tiny"><?= htmlspecialchars($assignment['project_name']) ?> • <?= htmlspecialchars($assignment['role'] ?? 'Contributor') ?></div>
+                                    <div class="tiny"><?= $assignment['start_date'] ?: 'TBD' ?> → <?= $assignment['end_date'] ?: 'TBD' ?> • <?= $assignment['committed_hours'] ? $assignment['committed_hours'] . 'h' : 'open scope' ?></div>
+                                </li>
+                            <?php endforeach; ?>
+                            <?php if (empty($freelancerAssignments)): ?>
+                                <li class="muted tiny">No active assignments in this window.</li>
+                            <?php endif; ?>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:2rem;">
+                <h2>Automation alerts <span>🚨</span></h2>
+                <?php if (!empty($alerts)): ?>
+                    <ul class="alert-list">
+                        <?php foreach ($alerts as $alert): ?>
+                            <?php $context = $alert['project_name'] ?? ($alert['client_name'] ?? 'General'); ?>
+                            <li>
+                                <span class="badge severity-<?= htmlspecialchars($alert['severity']) ?>"><?= ucfirst($alert['severity']) ?></span>
+                                <div>
+                                    <strong><?= htmlspecialchars($context) ?></strong>
+                                    <p class="muted small"><?= htmlspecialchars($alert['message']) ?></p>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="muted">No open alerts detected for this range.</p>
+                <?php endif; ?>
             </div>
 
             <div class="card" style="margin-top:2rem;">

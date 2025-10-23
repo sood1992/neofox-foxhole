@@ -146,6 +146,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'description' => trim($_POST['idea_description']) ?: null,
             ]);
             $_SESSION['flash'] = 'Idea added to the brain trust.';
+        } elseif ($action === 'create_invoice' && in_array($user['role'], ['admin', 'manager'], true)) {
+            $projectId = $_POST['invoice_project'] ? (int) $_POST['invoice_project'] : null;
+            if ($user['role'] === 'manager' && $projectId) {
+                $stmt = $pdo->prepare('SELECT manager_id FROM projects WHERE id = :id');
+                $stmt->execute(['id' => $projectId]);
+                $project = $stmt->fetch();
+                if (!$project || (int) $project['manager_id'] !== (int) $user['id']) {
+                    throw new RuntimeException('You can only invoice for your own projects.');
+                }
+            }
+            save_invoice($pdo, [
+                'client_id' => $_POST['invoice_client'],
+                'project_id' => $projectId,
+                'issue_date' => $_POST['issue_date'],
+                'due_date' => $_POST['due_date'] ?? null,
+                'amount' => $_POST['invoice_amount'],
+                'status' => $_POST['invoice_status'] ?? 'sent',
+                'notes' => $_POST['invoice_notes'] ?? '',
+            ]);
+            $_SESSION['flash'] = 'Invoice logged.';
+        } elseif ($action === 'log_expense' && in_array($user['role'], ['admin', 'manager'], true)) {
+            $projectId = $_POST['expense_project'] ? (int) $_POST['expense_project'] : null;
+            if ($user['role'] === 'manager' && $projectId) {
+                $stmt = $pdo->prepare('SELECT manager_id FROM projects WHERE id = :id');
+                $stmt->execute(['id' => $projectId]);
+                $project = $stmt->fetch();
+                if (!$project || (int) $project['manager_id'] !== (int) $user['id']) {
+                    throw new RuntimeException('You can only log expenses for your own projects.');
+                }
+            }
+            save_expense($pdo, [
+                'project_id' => $projectId,
+                'incurred_date' => $_POST['expense_date'],
+                'category' => $_POST['expense_category'] ?? 'misc',
+                'amount' => $_POST['expense_amount'],
+                'vendor' => $_POST['expense_vendor'] ?? '',
+                'description' => $_POST['expense_description'] ?? '',
+            ]);
+            $_SESSION['flash'] = 'Expense captured.';
+        } elseif ($action === 'create_freelancer' && $user['role'] === 'admin') {
+            save_freelancer($pdo, [
+                'name' => $_POST['freelancer_name'],
+                'specialty' => $_POST['freelancer_specialty'] ?? '',
+                'email' => $_POST['freelancer_email'] ?? '',
+                'status' => $_POST['freelancer_status'] ?? 'available',
+                'hourly_rate' => $_POST['freelancer_rate'] ?? null,
+                'location' => $_POST['freelancer_location'] ?? '',
+                'preferred_workload' => $_POST['freelancer_capacity'] ?? null,
+                'available_from' => $_POST['freelancer_available'] ?? null,
+                'notes' => $_POST['freelancer_notes'] ?? '',
+            ]);
+            $_SESSION['flash'] = 'Freelancer added to the roster.';
+        } elseif ($action === 'assign_freelancer' && in_array($user['role'], ['admin', 'manager'], true)) {
+            $projectId = (int) $_POST['assignment_project'];
+            if ($user['role'] === 'manager') {
+                $stmt = $pdo->prepare('SELECT manager_id FROM projects WHERE id = :id');
+                $stmt->execute(['id' => $projectId]);
+                $project = $stmt->fetch();
+                if (!$project || (int) $project['manager_id'] !== (int) $user['id']) {
+                    throw new RuntimeException('You can only staff freelancers on your own projects.');
+                }
+            }
+            save_freelancer_assignment($pdo, [
+                'freelancer_id' => $_POST['assignment_freelancer'],
+                'project_id' => $projectId,
+                'role' => $_POST['assignment_role'] ?? '',
+                'start_date' => $_POST['assignment_start'] ?? null,
+                'end_date' => $_POST['assignment_end'] ?? null,
+                'committed_hours' => $_POST['assignment_hours'] ?? null,
+            ]);
+            $_SESSION['flash'] = 'Freelancer assignment scheduled.';
+        } elseif ($action === 'update_freelancer_status' && in_array($user['role'], ['admin', 'manager'], true)) {
+            update_freelancer_status($pdo, (int) $_POST['freelancer_id'], $_POST['status']);
+            $_SESSION['flash'] = 'Freelancer status updated.';
         }
     } catch (Throwable $e) {
         $_SESSION['flash'] = 'Error: ' . $e->getMessage();
@@ -159,6 +233,7 @@ $managers = get_users_by_role($pdo, 'manager');
 $employees = get_users_by_role($pdo, 'employee');
 
 if ($user['role'] === 'admin') {
+    sync_automation_alerts($pdo, $monthStart->format('Y-m-d 00:00:00'), $monthEnd->format('Y-m-d 23:59:59'));
     $projects = get_projects($pdo);
     $projectIds = array_column($projects, 'id');
     $milestones = get_project_milestones($pdo, $projectIds);
@@ -169,6 +244,11 @@ if ($user['role'] === 'admin') {
     $ideas = get_idea_bank($pdo);
     $meetingNotes = get_meeting_notes($pdo);
     $blockers = get_blockers_feed($pdo);
+    $alerts = get_active_alerts($pdo);
+    $financials = get_profitability_overview($pdo);
+    $invoicePipeline = get_invoice_pipeline($pdo);
+    $freelancers = get_freelancers($pdo);
+    $freelancerAssignments = get_freelancer_assignments($pdo);
 
     $teamFocus = $pdo->query('SELECT u.name, u.focus_color, COUNT(t.id) AS active_tasks
         FROM users u
@@ -198,7 +278,17 @@ if ($user['role'] === 'admin') {
     }
     $retainerCoverage = $totalRetainerHours ? min(100, ($usedRetainerHours / $totalRetainerHours) * 100) : null;
     $avgEnergy = compute_focus_score($recentCheckins);
+
+    $financialTotals = [
+        'invoiced' => array_sum(array_column($financials, 'invoice_total')),
+        'paid' => array_sum(array_column($financials, 'invoice_paid')),
+        'expenses' => array_sum(array_column($financials, 'expense_total')),
+        'internal_cost' => array_sum(array_column($financials, 'internal_cost')),
+    ];
+    $financialTotals['outstanding'] = $financialTotals['invoiced'] - $financialTotals['paid'];
+    $financialTotals['margin'] = $financialTotals['paid'] - ($financialTotals['expenses'] + $financialTotals['internal_cost']);
 } elseif ($user['role'] === 'manager') {
+    sync_automation_alerts($pdo, $monthStart->format('Y-m-d 00:00:00'), $monthEnd->format('Y-m-d 23:59:59'));
     $projects = get_projects($pdo, $user['id']);
     $projectIds = array_column($projects, 'id');
     $milestones = get_project_milestones($pdo, $projectIds);
@@ -209,6 +299,11 @@ if ($user['role'] === 'admin') {
     $ideas = get_idea_bank($pdo);
     $meetingNotes = get_meeting_notes($pdo, $user['id']);
     $blockers = get_blockers_feed($pdo, $user['id']);
+    $alerts = get_active_alerts($pdo, $user['id']);
+    $financials = get_profitability_overview($pdo, $user['id']);
+    $invoicePipeline = get_invoice_pipeline($pdo, $user['id']);
+    $freelancers = get_freelancers($pdo);
+    $freelancerAssignments = get_freelancer_assignments($pdo, $user['id']);
 
     $stmt = $pdo->prepare('SELECT COUNT(*) FROM projects WHERE manager_id = :id AND status != "complete"');
     $stmt->execute(['id' => $user['id']]);
@@ -227,6 +322,15 @@ if ($user['role'] === 'admin') {
     $hoursWeek = round(($stmt->fetchColumn() / 60), 1);
 
     $avgEnergy = compute_focus_score($recentCheckins);
+
+    $financialTotals = [
+        'invoiced' => array_sum(array_column($financials, 'invoice_total')),
+        'paid' => array_sum(array_column($financials, 'invoice_paid')),
+        'expenses' => array_sum(array_column($financials, 'expense_total')),
+        'internal_cost' => array_sum(array_column($financials, 'internal_cost')),
+    ];
+    $financialTotals['outstanding'] = $financialTotals['invoiced'] - $financialTotals['paid'];
+    $financialTotals['margin'] = $financialTotals['paid'] - ($financialTotals['expenses'] + $financialTotals['internal_cost']);
 } else {
     $tasks = get_tasks_for_user($pdo, $user['id']);
     $recentCheckins = get_recent_checkins($pdo, 5, $user['id']);
@@ -324,6 +428,32 @@ if ($user['role'] === 'admin') {
                     </div>
                 </section>
 
+                <section class="card alert-feed">
+                    <h2>Automation alerts <span>🚨</span></h2>
+                    <?php if (!empty($alerts)): ?>
+                        <ul class="alert-list">
+                            <?php foreach ($alerts as $alert): ?>
+                                <?php
+                                    $context = $alert['project_name'] ?? ($alert['client_name'] ?? 'General');
+                                    $badgeClass = 'severity-' . $alert['severity'];
+                                ?>
+                                <li>
+                                    <span class="badge <?= htmlspecialchars($badgeClass) ?>"><?= ucfirst($alert['severity']) ?></span>
+                                    <div>
+                                        <strong><?= htmlspecialchars($context) ?></strong>
+                                        <p class="muted small"><?= htmlspecialchars($alert['message']) ?></p>
+                                        <?php if ($alert['user_name']): ?>
+                                            <p class="tiny">Pulse owner: <?= htmlspecialchars($alert['user_name']) ?></p>
+                                        <?php endif; ?>
+                                    </div>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <p class="muted">No alerts right now — the foxhole is calm. 🧘‍♀️</p>
+                    <?php endif; ?>
+                </section>
+
                 <div class="grid two-col">
                     <section class="card">
                         <h2>Client retainers <span>🤝</span></h2>
@@ -419,6 +549,252 @@ if ($user['role'] === 'admin') {
                     </section>
                 </div>
 
+                <div class="grid two-col">
+                    <section class="card">
+                        <h2>Financial cockpit <span>📊</span></h2>
+                        <div class="chip-row">
+                            <span class="chip">Paid <?= format_currency($financialTotals['paid']) ?></span>
+                            <span class="chip">Outstanding <?= format_currency($financialTotals['outstanding']) ?></span>
+                            <span class="chip">Expenses <?= format_currency($financialTotals['expenses']) ?></span>
+                            <span class="chip">Margin <?= format_currency($financialTotals['margin']) ?></span>
+                        </div>
+                        <table class="table tight" style="margin-top:1rem;">
+                            <thead>
+                                <tr>
+                                    <th>Project</th>
+                                    <th>Paid</th>
+                                    <th>Outstanding</th>
+                                    <th>Cost</th>
+                                    <th>Margin</th>
+                                    <th>Hours</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach (array_slice($financials, 0, 6) as $row):
+                                    $outstanding = $row['invoice_total'] - $row['invoice_paid'];
+                                    $marginPercent = $row['invoice_paid'] ? ($row['realized_margin'] / $row['invoice_paid']) * 100 : null;
+                                ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?= htmlspecialchars($row['name']) ?></strong>
+                                            <div class="muted tiny"><?= htmlspecialchars($row['client_name'] ?? 'Internal') ?></div>
+                                        </td>
+                                        <td><?= format_currency((float) $row['invoice_paid']) ?></td>
+                                        <td><?= format_currency((float) $outstanding) ?></td>
+                                        <td><?= format_currency((float) $row['total_cost']) ?></td>
+                                        <td>
+                                            <?= format_currency((float) $row['realized_margin']) ?>
+                                            <div class="muted tiny"><?= $marginPercent ? number_format($marginPercent, 0) : '—' ?>%</div>
+                                        </td>
+                                        <td><?= number_format($row['hours_logged'], 1) ?>h</td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </section>
+
+                    <section class="card">
+                        <h2>Billing desk <span>🧾</span></h2>
+                        <div class="chip-row muted" style="margin-bottom:1rem;">
+                            <span class="chip subtle">Total invoiced <?= format_currency($financialTotals['invoiced']) ?></span>
+                            <span class="chip subtle">Internal cost <?= format_currency($financialTotals['internal_cost']) ?></span>
+                        </div>
+                        <form method="post" class="inline-form">
+                            <input type="hidden" name="action" value="create_invoice">
+                            <h3 class="form-title">Log invoice</h3>
+                            <div class="form-grid">
+                                <select name="invoice_client" required>
+                                    <option value="">Client</option>
+                                    <?php foreach ($clients as $client): ?>
+                                        <option value="<?= $client['id'] ?>"><?= htmlspecialchars($client['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <select name="invoice_project">
+                                    <option value="">Project (optional)</option>
+                                    <?php foreach ($projects as $project): ?>
+                                        <option value="<?= $project['id'] ?>"><?= htmlspecialchars($project['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <input type="date" name="issue_date" value="<?= $today->format('Y-m-d') ?>" required>
+                                <input type="date" name="due_date" placeholder="Due date">
+                                <input type="number" step="0.01" name="invoice_amount" placeholder="Amount" required>
+                                <select name="invoice_status">
+                                    <option value="sent">Sent</option>
+                                    <option value="paid">Paid</option>
+                                    <option value="overdue">Overdue</option>
+                                    <option value="draft">Draft</option>
+                                </select>
+                                <textarea name="invoice_notes" placeholder="Notes"></textarea>
+                                <button class="primary-btn" type="submit">Save invoice</button>
+                            </div>
+                        </form>
+                        <form method="post" class="inline-form" style="margin-top:1rem;">
+                            <input type="hidden" name="action" value="log_expense">
+                            <h3 class="form-title">Track expense</h3>
+                            <div class="form-grid">
+                                <select name="expense_project">
+                                    <option value="">Project</option>
+                                    <?php foreach ($projects as $project): ?>
+                                        <option value="<?= $project['id'] ?>"><?= htmlspecialchars($project['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <input type="date" name="expense_date" value="<?= $today->format('Y-m-d') ?>" required>
+                                <select name="expense_category">
+                                    <option value="production">Production</option>
+                                    <option value="freelancer">Freelancer</option>
+                                    <option value="software">Software</option>
+                                    <option value="travel">Travel</option>
+                                    <option value="misc" selected>Misc</option>
+                                </select>
+                                <input type="number" step="0.01" name="expense_amount" placeholder="Amount" required>
+                                <input name="expense_vendor" placeholder="Vendor">
+                                <textarea name="expense_description" placeholder="Description"></textarea>
+                                <button class="primary-btn" type="submit">Log expense</button>
+                            </div>
+                        </form>
+                        <div class="invoice-pipeline">
+                            <h3 class="subhead">Invoice pipeline</h3>
+                            <ul>
+                                <?php foreach (array_slice($invoicePipeline, 0, 6) as $invoice): ?>
+                                    <li class="invoice <?= 'status-' . htmlspecialchars($invoice['status']) ?>">
+                                        <div>
+                                            <strong><?= htmlspecialchars($invoice['client_name']) ?></strong>
+                                            <?php if ($invoice['project_name']): ?><div class="tiny">Project <?= htmlspecialchars($invoice['project_name']) ?></div><?php endif; ?>
+                                        </div>
+                                        <div class="tiny">Due <?= $invoice['due_date'] ?: '—' ?> • <?= ucfirst($invoice['status']) ?> • <?= format_currency((float) $invoice['amount']) ?></div>
+                                    </li>
+                                <?php endforeach; ?>
+                                <?php if (empty($invoicePipeline)): ?>
+                                    <li class="muted tiny">No invoices yet.</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="grid two-col">
+                    <section class="card">
+                        <h2>Financial cockpit <span>📊</span></h2>
+                        <div class="chip-row">
+                            <span class="chip">Paid <?= format_currency($financialTotals['paid']) ?></span>
+                            <span class="chip">Outstanding <?= format_currency($financialTotals['outstanding']) ?></span>
+                            <span class="chip">Expenses <?= format_currency($financialTotals['expenses']) ?></span>
+                            <span class="chip">Margin <?= format_currency($financialTotals['margin']) ?></span>
+                        </div>
+                        <table class="table tight" style="margin-top:1rem;">
+                            <thead>
+                                <tr>
+                                    <th>Project</th>
+                                    <th>Paid</th>
+                                    <th>Outstanding</th>
+                                    <th>Cost</th>
+                                    <th>Margin</th>
+                                    <th>Hours</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach (array_slice($financials, 0, 6) as $row):
+                                    $outstanding = $row['invoice_total'] - $row['invoice_paid'];
+                                    $marginPercent = $row['invoice_paid'] ? ($row['realized_margin'] / $row['invoice_paid']) * 100 : null;
+                                ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?= htmlspecialchars($row['name']) ?></strong>
+                                            <div class="muted tiny"><?= htmlspecialchars($row['client_name'] ?? 'Internal') ?></div>
+                                        </td>
+                                        <td><?= format_currency((float) $row['invoice_paid']) ?></td>
+                                        <td><?= format_currency((float) $outstanding) ?></td>
+                                        <td><?= format_currency((float) $row['total_cost']) ?></td>
+                                        <td>
+                                            <?= format_currency((float) $row['realized_margin']) ?>
+                                            <div class="muted tiny"><?= $marginPercent ? number_format($marginPercent, 0) : '—' ?>%</div>
+                                        </td>
+                                        <td><?= number_format($row['hours_logged'], 1) ?>h</td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </section>
+
+                    <section class="card">
+                        <h2>Billing desk <span>🧾</span></h2>
+                        <div class="chip-row muted" style="margin-bottom:1rem;">
+                            <span class="chip subtle">Total invoiced <?= format_currency($financialTotals['invoiced']) ?></span>
+                            <span class="chip subtle">Internal cost <?= format_currency($financialTotals['internal_cost']) ?></span>
+                        </div>
+                        <form method="post" class="inline-form">
+                            <input type="hidden" name="action" value="create_invoice">
+                            <h3 class="form-title">Log invoice</h3>
+                            <div class="form-grid">
+                                <select name="invoice_client" required>
+                                    <option value="">Client</option>
+                                    <?php foreach ($clients as $client): ?>
+                                        <option value="<?= $client['id'] ?>"><?= htmlspecialchars($client['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <select name="invoice_project">
+                                    <option value="">Project (optional)</option>
+                                    <?php foreach ($projects as $project): ?>
+                                        <option value="<?= $project['id'] ?>"><?= htmlspecialchars($project['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <input type="date" name="issue_date" value="<?= $today->format('Y-m-d') ?>" required>
+                                <input type="date" name="due_date">
+                                <input type="number" step="0.01" name="invoice_amount" placeholder="Amount" required>
+                                <select name="invoice_status">
+                                    <option value="sent">Sent</option>
+                                    <option value="paid">Paid</option>
+                                    <option value="overdue">Overdue</option>
+                                    <option value="draft">Draft</option>
+                                </select>
+                                <textarea name="invoice_notes" placeholder="Notes"></textarea>
+                                <button class="primary-btn" type="submit">Save invoice</button>
+                            </div>
+                        </form>
+                        <form method="post" class="inline-form" style="margin-top:1rem;">
+                            <input type="hidden" name="action" value="log_expense">
+                            <h3 class="form-title">Track expense</h3>
+                            <div class="form-grid">
+                                <select name="expense_project">
+                                    <option value="">Project</option>
+                                    <?php foreach ($projects as $project): ?>
+                                        <option value="<?= $project['id'] ?>"><?= htmlspecialchars($project['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <input type="date" name="expense_date" value="<?= $today->format('Y-m-d') ?>" required>
+                                <select name="expense_category">
+                                    <option value="production">Production</option>
+                                    <option value="freelancer">Freelancer</option>
+                                    <option value="software">Software</option>
+                                    <option value="travel">Travel</option>
+                                    <option value="misc" selected>Misc</option>
+                                </select>
+                                <input type="number" step="0.01" name="expense_amount" placeholder="Amount" required>
+                                <input name="expense_vendor" placeholder="Vendor">
+                                <textarea name="expense_description" placeholder="Description"></textarea>
+                                <button class="primary-btn" type="submit">Log expense</button>
+                            </div>
+                        </form>
+                        <div class="invoice-pipeline">
+                            <h3 class="subhead">Invoice pipeline</h3>
+                            <ul>
+                                <?php foreach (array_slice($invoicePipeline, 0, 6) as $invoice): ?>
+                                    <li class="invoice <?= 'status-' . htmlspecialchars($invoice['status']) ?>">
+                                        <div>
+                                            <strong><?= htmlspecialchars($invoice['client_name']) ?></strong>
+                                            <?php if ($invoice['project_name']): ?><div class="tiny">Project <?= htmlspecialchars($invoice['project_name']) ?></div><?php endif; ?>
+                                        </div>
+                                        <div class="tiny">Due <?= $invoice['due_date'] ?: '—' ?> • <?= ucfirst($invoice['status']) ?> • <?= format_currency((float) $invoice['amount']) ?></div>
+                                    </li>
+                                <?php endforeach; ?>
+                                <?php if (empty($invoicePipeline)): ?>
+                                    <li class="muted tiny">No invoices yet.</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </section>
+                </div>
+
                 <section class="card">
                     <h2>Pipeline board <span>🗺️</span></h2>
                     <div class="pipeline-grid">
@@ -445,6 +821,74 @@ if ($user['role'] === 'admin') {
                         <?php endforeach; ?>
                     </div>
                 </section>
+
+                <div class="grid two-col">
+                    <section class="card">
+                        <h2>Freelancer roster <span>🧑‍🎨</span></h2>
+                        <ul class="freelancer-list">
+                            <?php foreach ($freelancers as $freelancer): ?>
+                                <li class="freelancer-card status-<?= htmlspecialchars($freelancer['status']) ?>">
+                                    <div>
+                                        <strong><?= htmlspecialchars($freelancer['name']) ?></strong>
+                                        <div class="muted tiny"><?= htmlspecialchars($freelancer['specialty'] ?? 'Multi-disciplinary') ?></div>
+                                        <div class="tiny">Rate <?= format_rate($freelancer['hourly_rate'] ? (float) $freelancer['hourly_rate'] : null) ?> • Pref <?= $freelancer['preferred_workload'] ? $freelancer['preferred_workload'] . 'h/wk' : '—' ?></div>
+                                        <?php if ($freelancer['available_from']): ?><div class="tiny">Next open <?= (new DateTimeImmutable($freelancer['available_from']))->format('M d') ?></div><?php endif; ?>
+                                        <?php if ($freelancer['location']): ?><div class="tiny muted"><?= htmlspecialchars($freelancer['location']) ?></div><?php endif; ?>
+                                        <?php if ($freelancer['notes']): ?><div class="tiny muted"><?= htmlspecialchars($freelancer['notes']) ?></div><?php endif; ?>
+                                    </div>
+                                    <form method="post" class="tiny-form">
+                                        <input type="hidden" name="action" value="update_freelancer_status">
+                                        <input type="hidden" name="freelancer_id" value="<?= $freelancer['id'] ?>">
+                                        <select name="status" onchange="this.form.submit()">
+                                            <option value="available" <?= $freelancer['status'] === 'available' ? 'selected' : '' ?>>Available</option>
+                                            <option value="booked" <?= $freelancer['status'] === 'booked' ? 'selected' : '' ?>>Booked</option>
+                                            <option value="cooldown" <?= $freelancer['status'] === 'cooldown' ? 'selected' : '' ?>>Cooldown</option>
+                                        </select>
+                                    </form>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </section>
+
+                    <section class="card">
+                        <h2>Assignments &amp; availability <span>📅</span></h2>
+                        <ul class="assignment-list">
+                            <?php foreach ($freelancerAssignments as $assignment): ?>
+                                <li>
+                                    <strong><?= htmlspecialchars($assignment['freelancer_name']) ?></strong>
+                                    <div class="muted tiny"><?= htmlspecialchars($assignment['project_name']) ?> • Role <?= htmlspecialchars($assignment['role'] ?? 'Contributor') ?></div>
+                                    <div class="tiny"><?= $assignment['start_date'] ?: 'TBD' ?> → <?= $assignment['end_date'] ?: 'TBD' ?> • <?= $assignment['committed_hours'] ? $assignment['committed_hours'] . 'h' : 'open scope' ?></div>
+                                </li>
+                            <?php endforeach; ?>
+                            <?php if (empty($freelancerAssignments)): ?>
+                                <li class="muted tiny">No active assignments logged.</li>
+                            <?php endif; ?>
+                        </ul>
+                        <form method="post" class="inline-form" style="margin-top:1rem;">
+                            <input type="hidden" name="action" value="assign_freelancer">
+                            <h3 class="form-title">Staff project</h3>
+                            <div class="form-grid">
+                                <select name="assignment_freelancer" required>
+                                    <option value="">Freelancer</option>
+                                    <?php foreach ($freelancers as $freelancer): ?>
+                                        <option value="<?= $freelancer['id'] ?>"><?= htmlspecialchars($freelancer['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <select name="assignment_project" required>
+                                    <option value="">Project</option>
+                                    <?php foreach ($projects as $project): ?>
+                                        <option value="<?= $project['id'] ?>"><?= htmlspecialchars($project['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <input name="assignment_role" placeholder="Role (e.g. editor)">
+                                <input type="date" name="assignment_start" value="<?= $today->format('Y-m-d') ?>">
+                                <input type="date" name="assignment_end">
+                                <input type="number" name="assignment_hours" placeholder="Hours">
+                                <button class="primary-btn" type="submit">Assign</button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
 
                 <section class="card">
                     <h2>Team updates <span>📰</span></h2>
@@ -686,6 +1130,96 @@ if ($user['role'] === 'admin') {
                     </div>
                 </section>
 
+                <div class="grid two-col">
+                    <section class="card">
+                        <h2>Freelancer roster <span>🧑‍🎨</span></h2>
+                        <ul class="freelancer-list">
+                            <?php foreach ($freelancers as $freelancer): ?>
+                                <li class="freelancer-card status-<?= htmlspecialchars($freelancer['status']) ?>">
+                                    <div>
+                                        <strong><?= htmlspecialchars($freelancer['name']) ?></strong>
+                                        <div class="muted tiny"><?= htmlspecialchars($freelancer['specialty'] ?? 'Multi-disciplinary') ?></div>
+                                        <div class="tiny">Rate <?= format_rate($freelancer['hourly_rate'] ? (float) $freelancer['hourly_rate'] : null) ?> • Pref <?= $freelancer['preferred_workload'] ? $freelancer['preferred_workload'] . 'h/wk' : '—' ?></div>
+                                        <?php if ($freelancer['available_from']): ?><div class="tiny">Next open <?= (new DateTimeImmutable($freelancer['available_from']))->format('M d') ?></div><?php endif; ?>
+                                        <?php if ($freelancer['location']): ?><div class="tiny muted"><?= htmlspecialchars($freelancer['location']) ?></div><?php endif; ?>
+                                        <?php if ($freelancer['notes']): ?><div class="tiny muted"><?= htmlspecialchars($freelancer['notes']) ?></div><?php endif; ?>
+                                    </div>
+                                    <form method="post" class="tiny-form">
+                                        <input type="hidden" name="action" value="update_freelancer_status">
+                                        <input type="hidden" name="freelancer_id" value="<?= $freelancer['id'] ?>">
+                                        <select name="status" onchange="this.form.submit()">
+                                            <option value="available" <?= $freelancer['status'] === 'available' ? 'selected' : '' ?>>Available</option>
+                                            <option value="booked" <?= $freelancer['status'] === 'booked' ? 'selected' : '' ?>>Booked</option>
+                                            <option value="cooldown" <?= $freelancer['status'] === 'cooldown' ? 'selected' : '' ?>>Cooldown</option>
+                                        </select>
+                                    </form>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                        <?php if ($user['role'] === 'admin'): ?>
+                            <form method="post" class="inline-form" style="margin-top:1rem;">
+                                <input type="hidden" name="action" value="create_freelancer">
+                                <h3 class="form-title">Add freelancer</h3>
+                                <div class="form-grid">
+                                    <input name="freelancer_name" placeholder="Name" required>
+                                    <input name="freelancer_specialty" placeholder="Specialty">
+                                    <input type="email" name="freelancer_email" placeholder="Email">
+                                    <input type="number" step="0.01" name="freelancer_rate" placeholder="Hourly rate">
+                                    <input name="freelancer_location" placeholder="Location">
+                                    <input type="number" name="freelancer_capacity" placeholder="Ideal hrs/week">
+                                    <input type="date" name="freelancer_available" placeholder="Available from">
+                                    <select name="freelancer_status">
+                                        <option value="available" selected>Available</option>
+                                        <option value="booked">Booked</option>
+                                        <option value="cooldown">Cooldown</option>
+                                    </select>
+                                    <textarea name="freelancer_notes" placeholder="Notes"></textarea>
+                                    <button class="primary-btn" type="submit">Save freelancer</button>
+                                </div>
+                            </form>
+                        <?php endif; ?>
+                    </section>
+
+                    <section class="card">
+                        <h2>Assignments &amp; availability <span>📅</span></h2>
+                        <ul class="assignment-list">
+                            <?php foreach ($freelancerAssignments as $assignment): ?>
+                                <li>
+                                    <strong><?= htmlspecialchars($assignment['freelancer_name']) ?></strong>
+                                    <div class="muted tiny"><?= htmlspecialchars($assignment['project_name']) ?> • Role <?= htmlspecialchars($assignment['role'] ?? 'Contributor') ?></div>
+                                    <div class="tiny"><?= $assignment['start_date'] ?: 'TBD' ?> → <?= $assignment['end_date'] ?: 'TBD' ?> • <?= $assignment['committed_hours'] ? $assignment['committed_hours'] . 'h' : 'open scope' ?></div>
+                                </li>
+                            <?php endforeach; ?>
+                            <?php if (empty($freelancerAssignments)): ?>
+                                <li class="muted tiny">No active assignments logged.</li>
+                            <?php endif; ?>
+                        </ul>
+                        <form method="post" class="inline-form" style="margin-top:1rem;">
+                            <input type="hidden" name="action" value="assign_freelancer">
+                            <h3 class="form-title">Staff project</h3>
+                            <div class="form-grid">
+                                <select name="assignment_freelancer" required>
+                                    <option value="">Freelancer</option>
+                                    <?php foreach ($freelancers as $freelancer): ?>
+                                        <option value="<?= $freelancer['id'] ?>"><?= htmlspecialchars($freelancer['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <select name="assignment_project" required>
+                                    <option value="">Project</option>
+                                    <?php foreach ($projects as $project): ?>
+                                        <option value="<?= $project['id'] ?>"><?= htmlspecialchars($project['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <input name="assignment_role" placeholder="Role (e.g. editor)">
+                                <input type="date" name="assignment_start" value="<?= $today->format('Y-m-d') ?>">
+                                <input type="date" name="assignment_end">
+                                <input type="number" name="assignment_hours" placeholder="Hours">
+                                <button class="primary-btn" type="submit">Assign</button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
+
             <?php elseif ($user['role'] === 'manager'): ?>
                 <section class="stat-grid">
                     <div class="stat-card">
@@ -708,6 +1242,32 @@ if ($user['role'] === 'admin') {
                         <div class="value"><?= array_sum(array_column($pipeline, 'total')) ?></div>
                         <p class="muted">Across stages</p>
                     </div>
+                </section>
+
+                <section class="card alert-feed">
+                    <h2>Automation alerts <span>🚨</span></h2>
+                    <?php if (!empty($alerts)): ?>
+                        <ul class="alert-list">
+                            <?php foreach ($alerts as $alert): ?>
+                                <?php
+                                    $context = $alert['project_name'] ?? ($alert['client_name'] ?? 'General');
+                                    $badgeClass = 'severity-' . $alert['severity'];
+                                ?>
+                                <li>
+                                    <span class="badge <?= htmlspecialchars($badgeClass) ?>"><?= ucfirst($alert['severity']) ?></span>
+                                    <div>
+                                        <strong><?= htmlspecialchars($context) ?></strong>
+                                        <p class="muted small"><?= htmlspecialchars($alert['message']) ?></p>
+                                        <?php if ($alert['user_name']): ?>
+                                            <p class="tiny">Pulse owner: <?= htmlspecialchars($alert['user_name']) ?></p>
+                                        <?php endif; ?>
+                                    </div>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <p class="muted">No alerts right now — keep steering the calm waters.</p>
+                    <?php endif; ?>
                 </section>
 
                 <section class="card">

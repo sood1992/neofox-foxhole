@@ -146,6 +146,72 @@ CREATE TABLE idea_bank (
     FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+CREATE TABLE freelancers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(160) NOT NULL,
+    specialty VARCHAR(160) DEFAULT NULL,
+    email VARCHAR(160) DEFAULT NULL,
+    status ENUM('available','booked','cooldown') NOT NULL DEFAULT 'available',
+    hourly_rate DECIMAL(8,2) DEFAULT NULL,
+    location VARCHAR(120) DEFAULT NULL,
+    preferred_workload INT DEFAULT NULL,
+    available_from DATE DEFAULT NULL,
+    notes VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE freelancer_assignments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    freelancer_id INT NOT NULL,
+    project_id INT NOT NULL,
+    role VARCHAR(120) DEFAULT NULL,
+    start_date DATE DEFAULT NULL,
+    end_date DATE DEFAULT NULL,
+    committed_hours INT DEFAULT NULL,
+    FOREIGN KEY (freelancer_id) REFERENCES freelancers(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE TABLE invoices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id INT NOT NULL,
+    project_id INT DEFAULT NULL,
+    issue_date DATE NOT NULL,
+    due_date DATE DEFAULT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    status ENUM('draft','sent','paid','overdue','void') NOT NULL DEFAULT 'sent',
+    notes VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+);
+
+CREATE TABLE expenses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    project_id INT DEFAULT NULL,
+    incurred_date DATE NOT NULL,
+    category ENUM('freelancer','production','software','travel','misc') NOT NULL DEFAULT 'misc',
+    amount DECIMAL(10,2) NOT NULL,
+    vendor VARCHAR(160) DEFAULT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+);
+
+CREATE TABLE alerts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    hash CHAR(32) NOT NULL UNIQUE,
+    category ENUM('deadline','budget','wellbeing','invoice','retainer') NOT NULL,
+    message VARCHAR(255) NOT NULL,
+    severity ENUM('info','watch','urgent') NOT NULL DEFAULT 'info',
+    related_project_id INT DEFAULT NULL,
+    related_user_id INT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP NULL DEFAULT NULL,
+    FOREIGN KEY (related_project_id) REFERENCES projects(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
 -- Seed admin, project manager, and employee demo users
 INSERT INTO users (name, email, password_hash, role, title, weekly_capacity_minutes, focus_color) VALUES
 ('Ava Reynolds', 'admin@neofox.io', '$2y$10$EX8p8BWWTI7xoWh6o7VI3uI1cWDVYj1WFJsbgx5caX5/C/PObbIVS', 'admin', 'CEO', 2400, '#FF8A65'),
@@ -199,3 +265,31 @@ INSERT INTO meeting_notes (project_id, facilitator_id, note_date, summary, next_
 VALUES
 (1, 2, DATE_SUB(NOW(), INTERVAL 2 DAY), 'Weekly sync covered ad sequencing and logistics.', 'Confirm inventory thresholds with client ops team.'),
 (2, 2, DATE_SUB(NOW(), INTERVAL 1 DAY), 'Creative jam to unblock TikTok ideation.', 'Schedule micro-shoot once prop list finalized.');
+
+INSERT INTO freelancers (name, specialty, email, status, hourly_rate, location, preferred_workload, available_from, notes)
+VALUES
+('Harper Voss', 'Motion Design', 'harper@craftcollab.io', 'booked', 85.00, 'Toronto', 25, DATE_ADD(NOW(), INTERVAL 5 DAY), 'Loves kinetic typography.'),
+('Santi Alvarez', 'Paid Media Buying', 'santi@adsculpt.com', 'available', 95.00, 'Remote - GMT-3', 30, DATE_SUB(NOW(), INTERVAL 2 DAY), 'Meta + TikTok certified.'),
+('Mei Tanaka', 'Photographer', 'mei@studiozen.jp', 'cooldown', 120.00, 'Tokyo', 20, DATE_ADD(NOW(), INTERVAL 14 DAY), 'Available for remote edit support.');
+
+INSERT INTO freelancer_assignments (freelancer_id, project_id, role, start_date, end_date, committed_hours)
+VALUES
+(1, 1, 'Lead animator', DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 12 DAY), 35),
+(3, 2, 'Product photographer', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 6 DAY), 18);
+
+INSERT INTO invoices (client_id, project_id, issue_date, due_date, amount, status, notes)
+VALUES
+(2, 1, DATE_SUB(NOW(), INTERVAL 12 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY), 14500.00, 'overdue', 'Waiting on AP remittance.'),
+(2, 1, DATE_SUB(NOW(), INTERVAL 32 DAY), DATE_SUB(NOW(), INTERVAL 14 DAY), 13500.00, 'paid', 'Holiday kickoff milestone.'),
+(3, 2, DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_ADD(NOW(), INTERVAL 8 DAY), 5200.00, 'sent', 'TikTok sprint deliverable.');
+
+INSERT INTO expenses (project_id, incurred_date, category, amount, vendor, description)
+VALUES
+(1, DATE_SUB(NOW(), INTERVAL 4 DAY), 'production', 2100.00, 'Storyboard Studio', 'Illustration polish + layering'),
+(2, DATE_SUB(NOW(), INTERVAL 2 DAY), 'freelancer', 1450.00, 'Orbit Creator Collective', 'Creator stipends wave 1'),
+(2, DATE_SUB(NOW(), INTERVAL 9 DAY), 'software', 320.00, 'EditFlow', 'Pro license upgrade for sprint');
+
+INSERT INTO alerts (hash, category, message, severity, related_project_id, related_user_id)
+VALUES
+(MD5('invoice|1|Juniper Holiday Campaign overdue'), 'invoice', 'Juniper Holiday Campaign invoice is overdue — nudge finance.', 'watch', 1, NULL),
+(MD5('wellbeing|3|needs recharge'), 'wellbeing', 'Riley Chen reported energy 5/10 yesterday — schedule a focus reset.', 'info', NULL, 3);
