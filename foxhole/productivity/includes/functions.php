@@ -7,6 +7,57 @@ if (!defined('FOXHOLE_INTERNAL_RATE')) {
     define('FOXHOLE_INTERNAL_RATE', 65);
 }
 
+if (!defined('FOXHOLE_DEMO_PASSWORD')) {
+    define('FOXHOLE_DEMO_PASSWORD', getenv('FOXHOLE_DEMO_PASSWORD') ?: 'foxhole2024');
+}
+
+if (!defined('FOXHOLE_LEGACY_DEMO_HASH')) {
+    define('FOXHOLE_LEGACY_DEMO_HASH', '$2y$10$EX8p8BWWTI7xoWh6o7VI3uI1cWDVYj1WFJsbgx5caX5/C/PObbIVS');
+}
+
+if (!defined('FOXHOLE_DEMO_EMAILS')) {
+    define('FOXHOLE_DEMO_EMAILS', [
+        'admin@neofox.io',
+        'pm@neofox.io',
+        'employee@neofox.io',
+    ]);
+}
+
+/**
+ * Attempt to upgrade seeded demo accounts that still carry the legacy password hash.
+ */
+function maybe_upgrade_demo_password(PDO $pdo, array $user, string $attemptedPassword): ?array
+{
+    if (!isset($user['id'], $user['email'], $user['password_hash'])) {
+        return null;
+    }
+
+    if (!in_array($user['email'], FOXHOLE_DEMO_EMAILS, true)) {
+        return null;
+    }
+
+    if (!hash_equals($user['password_hash'], FOXHOLE_LEGACY_DEMO_HASH)) {
+        return null;
+    }
+
+    if (!hash_equals($attemptedPassword, FOXHOLE_DEMO_PASSWORD)) {
+        return null;
+    }
+
+    try {
+        $freshHash = password_hash(FOXHOLE_DEMO_PASSWORD, PASSWORD_BCRYPT);
+        $stmt = $pdo->prepare('UPDATE users SET password_hash = :hash WHERE id = :id');
+        $stmt->execute([
+            'hash' => $freshHash,
+            'id' => $user['id'],
+        ]);
+        $user['password_hash'] = $freshHash;
+        return $user;
+    } catch (PDOException $exception) {
+        return null;
+    }
+}
+
 function is_authenticated(): bool
 {
     return isset($_SESSION['user']);

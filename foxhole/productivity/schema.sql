@@ -214,11 +214,11 @@ CREATE TABLE alerts (
 
 -- Seed admin, project manager, and employee demo users
 INSERT INTO users (name, email, password_hash, role, title, weekly_capacity_minutes, focus_color) VALUES
-('Ava Reynolds', 'admin@neofox.io', '$2y$10$EX8p8BWWTI7xoWh6o7VI3uI1cWDVYj1WFJsbgx5caX5/C/PObbIVS', 'admin', 'CEO', 2400, '#FF8A65'),
-('Milo Carter', 'pm@neofox.io', '$2y$10$EX8p8BWWTI7xoWh6o7VI3uI1cWDVYj1WFJsbgx5caX5/C/PObbIVS', 'manager', 'Project Maestro', 2100, '#FFD166'),
-('Riley Chen', 'employee@neofox.io', '$2y$10$EX8p8BWWTI7xoWh6o7VI3uI1cWDVYj1WFJsbgx5caX5/C/PObbIVS', 'employee', 'Creative Strategist', 1980, '#06D6A0');
+('Ava Reynolds', 'admin@neofox.io', '$2y$12$sgMYT1C1KHYzr5bgo6oQAuoZmeLblmj.UQDWOSMCoHYmxlFCaiN2y', 'admin', 'CEO', 2400, '#FF8A65'),
+('Milo Carter', 'pm@neofox.io', '$2y$12$sgMYT1C1KHYzr5bgo6oQAuoZmeLblmj.UQDWOSMCoHYmxlFCaiN2y', 'manager', 'Project Maestro', 2100, '#FFD166'),
+('Riley Chen', 'employee@neofox.io', '$2y$12$sgMYT1C1KHYzr5bgo6oQAuoZmeLblmj.UQDWOSMCoHYmxlFCaiN2y', 'employee', 'Creative Strategist', 1980, '#06D6A0');
 
--- Password for demo users: foxhole2024
+-- Password for demo users: foxhole2024 (override with FOXHOLE_DEMO_PASSWORD environment variable)
 
 -- Seed sample clients
 INSERT INTO clients (name, industry, relationship_status, account_lead, retainer_hours, retainer_value, brand_vibe) VALUES

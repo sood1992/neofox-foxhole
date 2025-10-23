@@ -24,6 +24,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: dashboard.php');
             exit;
         }
+
+        if ($user) {
+            $upgradedUser = maybe_upgrade_demo_password($pdo, $user, $password);
+            if ($upgradedUser) {
+                unset($upgradedUser['password_hash']);
+                $_SESSION['user'] = $upgradedUser;
+                header('Location: dashboard.php');
+                exit;
+            }
+        }
     }
     $error = 'Invalid credentials. Double-check your email, password, and role selection.';
 }
@@ -58,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label>Password</label>
                 <input type="password" name="password" placeholder="Enter your password" required>
                 <button type="submit" class="primary-btn">Sign in</button>
-                <p class="demo-tip">Demo logins:<br>Admin admin@neofox.io • PM pm@neofox.io • Employee employee@neofox.io<br>Password: foxhole2024</p>
+                <p class="demo-tip">Demo logins:<br>Admin admin@neofox.io • PM pm@neofox.io • Employee employee@neofox.io<br>Password: <?= htmlspecialchars(FOXHOLE_DEMO_PASSWORD) ?></p>
             </form>
         </div>
     </div>

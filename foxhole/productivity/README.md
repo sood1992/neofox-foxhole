@@ -22,7 +22,10 @@ Foxhole is Neofox's ADHD-friendly operations cockpit for a full-stack marketing 
    SOURCE productivity/schema.sql;
    ```
 4. Deploy the `productivity` directory to your web root and browse to `/productivity/index.php`.
-5. Sign in with a demo account (`admin@neofox.io`, `pm@neofox.io`, `employee@neofox.io`, password `foxhole2024`).
+5. Sign in with a demo account (`admin@neofox.io`, `pm@neofox.io`, `employee@neofox.io`, password `${FOXHOLE_DEMO_PASSWORD:-foxhole2024}`).
+
+> ℹ️  Set the `FOXHOLE_DEMO_PASSWORD` environment variable before deployment to customise the shared demo password.
+> Existing seeded accounts with the legacy hash are automatically upgraded the first time someone signs in with the updated password.
 
 ## Modules at a glance
 - `dashboard.php`: Adaptive UI for each role with forms to launch projects, log milestones, document meetings, submit check-ins, and capture ideas.
